@@ -52,6 +52,7 @@ public class TurnTimerService {
     // 원하는 시간으로 시작. 마감 시각 반환
     public synchronized Instant start(String roomCode, int team, TimerType type, Duration limit){
         Objects.requireNonNullElse(roomCode, "roomCode");
+        Objects.requireNonNull(type, "type");
         if(limit == null || limit.isNegative() || limit.isZero()){
             throw new IllegalArgumentException("제한시간은 0보다 커야합니다. (현재 " + limit + ")");
         }
