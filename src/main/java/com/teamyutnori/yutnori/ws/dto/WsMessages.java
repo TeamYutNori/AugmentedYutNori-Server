@@ -6,4 +6,6 @@ public final class WsMessages {
 
     public record PongMessage(long clientTime, long serverTime) {}
     public record ErrorMessage(String code, String message) {}
+    public record PlayerDisconnectedMessage(String playerId, int graceSec) {}
+    public record PlayerReconnectedMessage(String playerId) {}
 }
