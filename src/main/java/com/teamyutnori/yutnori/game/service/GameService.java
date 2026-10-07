@@ -9,7 +9,6 @@ import com.teamyutnori.yutnori.game.augment.AugmentDraftService;
 import com.teamyutnori.yutnori.game.augment.RethrowValidator;
 import com.teamyutnori.yutnori.game.dto.GameMessages.AugmentChoicesMessage;
 import com.teamyutnori.yutnori.game.dto.GameMessages.AugmentSelectedMessage;
-import com.teamyutnori.yutnori.game.dto.GameMessages.GameEndedMessage;
 import com.teamyutnori.yutnori.game.dto.GameMessages.ThrowResultMessage;
 import com.teamyutnori.yutnori.game.dto.GameMessages.TurnChangedMessage;
 import com.teamyutnori.yutnori.game.model.GameEndReason;
@@ -19,22 +18,33 @@ import com.teamyutnori.yutnori.game.model.GameSetup;
 import com.teamyutnori.yutnori.game.repository.GameSessionRepository;
 import com.teamyutnori.yutnori.game.yut.YutThrowOutcome;
 import com.teamyutnori.yutnori.game.yut.YutThrowService;
+import com.teamyutnori.yutnori.reconnect.GameEndPort;
+import com.teamyutnori.yutnori.reconnect.TimerType;
+import com.teamyutnori.yutnori.reconnect.TurnTimeoutEvent;
+import com.teamyutnori.yutnori.reconnect.TurnTimerService;
 import com.teamyutnori.yutnori.ws.RoomBroadcaster;
 import com.teamyutnori.yutnori.ws.dto.MessageType;
+import com.teamyutnori.yutnori.ws.dto.WsMessages.GameEndedMessage;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.teamyutnori.yutnori.game.exception.GameErrorCode.*;
 
 // 게임 메시지 처리 입구.  흐름: 세션 꺼내기 → 검증(실패 시 common 예외) → 상태 변경(TurnManager 등) → 방송
 // 예외는 MessageRouter가 BusinessException으로 잡아 ERROR 메시지로 보낸다
 // 같은 방 요청이 동시에 와도 꼬이지 않게 세션 단위로 synchronized
+//
+// 다른 담당과의 연결
+//  - TurnTimerService(재접속·타이머 담당): 턴이 바뀌면 start, 증강 선택 시작 시 startAugmentSelect, 끝나면 cancel
+//    시간이 다 되면 TurnTimeoutEvent를 받아 처리한다 (onTimerExpired)
+//  - GameEndPort(재접속 담당이 정의): 끊김 기권 처리에서 게임 상태 조회·종료에 쓰도록 이 클래스가 구현한다
 @Service
 @RequiredArgsConstructor
-public class GameService {
+public class GameService implements GameEndPort {
 
     private final GameSessionRepository sessionRepository;
     private final TurnManager turnManager;
@@ -43,6 +53,7 @@ public class GameService {
     private final RethrowValidator rethrowValidator;
     private final RoomBroadcaster broadcaster;
     private final GameProperties gameProperties;
+    private final TurnTimerService turnTimerService;
 
     // ═══════════ 2번(RoomService) → 게임 시작 ═══════════
 
@@ -56,7 +67,7 @@ public class GameService {
 
         synchronized (session) {
             int count = gameProperties.augmentChoiceCount();
-            int limitSec = toSeconds(gameProperties.augmentSelectTimeLimit());
+            int limitSec = turnTimerService.limitSec(TimerType.AUGMENT_SELECT);
 
             // 1) 모든 팀의 후보를 먼저 뽑는다. 중간에 실패하면 세션을 지워 "시작도 못 하고 멈춘 게임"이 남지 않게 한다
             try {
@@ -74,9 +85,13 @@ public class GameService {
                         new AugmentChoicesMessage(team, session.getOfferedAugments().get(team), limitSec));
             }
 
-            // 줄 수 있는 후보가 하나도 없으면(증강 목록이 비어 있는 경우 등) 선택 단계를 건너뛰고 바로 시작한다.
-            // 이 처리가 없으면 아무도 고를 수 없어서 AUGMENT_SELECT 단계에서 영원히 멈춘다
-            if (!session.hasAnyPendingOffer()) {
+            if (session.hasAnyPendingOffer()) {
+                // 증강 선택 타이머 시작. 모든 팀이 동시에 고르므로 방 단위 타이머 하나만 건다
+                // (TurnTimerService는 방마다 타이머 1개. team 값은 증강 선택에서 쓰지 않아 0을 넣는다)
+                turnTimerService.startAugmentSelect(roomCode, 0);
+            } else {
+                // 줄 수 있는 후보가 하나도 없으면(증강 목록이 비어 있는 경우 등) 선택 단계를 건너뛰고 바로 시작한다.
+                // 이 처리가 없으면 아무도 고를 수 없어서 AUGMENT_SELECT 단계에서 영원히 멈춘다
                 session.setPhase(GamePhase.PLAYING);
                 turnManager.startFirstTurn(session);
                 broadcastTurnChanged(session);
@@ -167,7 +182,7 @@ public class GameService {
                 throw new ForbiddenException(NOT_YOUR_TURN, "현재 차례가 아닌 팀의 이동입니다: " + team);
             }
             if (isFinished) {
-                endGame(session, team, GameEndReason.FINISHED);
+                finishGame(session, team, GameEndReason.FINISHED);
                 return;
             }
             boolean turnChanged = turnManager.afterMove(session, moveCount, capturedCount, hasRemainingAction);
@@ -177,13 +192,25 @@ public class GameService {
         }
     }
 
-    // 턴 제한시간 초과. turnNumber: 타이머를 시작할 때 받은 TURN_CHANGED의 턴 번호
-    // 그 사이 턴이 이미 바뀌었으면(번호가 다르면) 늦게 도착한 타이머이므로 무시한다
-    public void onTurnTimeout(String roomCode, int turnNumber) {
-        GameSession session = getSession(roomCode);
+    // TurnTimerService가 제한시간이 끝나면 발행하는 이벤트 (타이머 스레드에서 호출됨)
+    // 늦게 울린 옛 타이머는 TurnTimerService가 먼저 걸러 준다
+    @EventListener
+    public void onTimerExpired(TurnTimeoutEvent event) {
+        switch (event.type()) {
+            case TURN -> onTurnTimeout(event.roomCode(), event.team());
+            case AUGMENT_SELECT -> onAugmentSelectTimeout(event.roomCode());
+        }
+    }
+
+    // 턴 제한시간 초과 → 다음 팀으로 넘긴다
+    // 타이머 스레드에서 오므로 세션이 없으면 예외 대신 조용히 무시한다
+    public void onTurnTimeout(String roomCode, int team) {
+        Optional<GameSession> found = sessionRepository.find(roomCode);
+        if (found.isEmpty()) return;
+        GameSession session = found.get();
         synchronized (session) {
             if (session.getPhase() != GamePhase.PLAYING) return;
-            if (session.getTurnNumber() != turnNumber) return;
+            if (session.getCurrentTeam() != team) return;   // 그 사이 턴이 이미 바뀌었으면 무시 (이중 안전장치)
             turnManager.nextTurn(session);
             broadcastTurnChanged(session);
         }
@@ -191,7 +218,9 @@ public class GameService {
 
     // 증강 선택 제한시간 초과 → 아직 안 고른 팀은 첫 번째 후보로 자동 선택
     public void onAugmentSelectTimeout(String roomCode) {
-        GameSession session = getSession(roomCode);
+        Optional<GameSession> found = sessionRepository.find(roomCode);
+        if (found.isEmpty()) return;
+        GameSession session = found.get();
         synchronized (session) {
             if (session.getPhase() != GamePhase.AUGMENT_SELECT) return;
             for (int team = 0; team < session.getSetup().teamCount(); team++) {
@@ -209,13 +238,46 @@ public class GameService {
         synchronized (session) {
             if (session.getPhase() == GamePhase.ENDED) return;
             int winner = (loserTeam + 1) % session.getSetup().teamCount();
-            endGame(session, winner, reason);
+            finishGame(session, winner, reason);
         }
     }
 
     // 결과 기록·정리가 끝난 뒤 세션 삭제
     public void removeGame(String roomCode) {
         sessionRepository.delete(roomCode);
+    }
+
+    // ═══════════ GameEndPort 구현 (재접속 담당 DisconnectTimeoutHandler가 호출) ═══════════
+
+    // 진행 중인 게임인지 (증강 선택 중도 게임 중으로 본다. 없는 방·끝난 게임이면 false)
+    @Override
+    public boolean isPlaying(String roomCode) {
+        return sessionRepository.find(roomCode)
+                .map(session -> {
+                    synchronized (session) {
+                        return session.getPhase() != GamePhase.ENDED;
+                    }
+                })
+                .orElse(false);
+    }
+
+    // 플레이어의 팀 번호
+    @Override
+    public Optional<Integer> findTeam(String roomCode, String playerId) {
+        return sessionRepository.find(roomCode).flatMap(session -> session.teamOf(playerId));
+    }
+
+    // 게임 종료 상태로만 바꾼다.
+    // GAME_ENDED 전송과 타이머 취소는 DisconnectTimeoutHandler가 직접 하므로 여기서 또 하면 종료 메시지가 두 번 나간다
+    @Override
+    public void endGame(String roomCode, int winnerTeam) {
+        sessionRepository.find(roomCode).ifPresent(session -> {
+            synchronized (session) {
+                if (session.getPhase() == GamePhase.ENDED) return;
+                session.setPhase(GamePhase.ENDED);
+                session.setWinnerTeam(winnerTeam);
+            }
+        });
     }
 
     // ═══════════ 내부 처리 ═══════════
@@ -234,17 +296,21 @@ public class GameService {
         }
     }
 
-    private void endGame(GameSession session, int winnerTeam, GameEndReason reason) {
+    // 게임 안에서 끝났을 때(완주·기권): 상태 변경 + 타이머 취소 + GAME_ENDED 전송
+    private void finishGame(GameSession session, int winnerTeam, GameEndReason reason) {
         session.setPhase(GamePhase.ENDED);
         session.setWinnerTeam(winnerTeam);
+        turnTimerService.cancel(session.getRoomCode());
         broadcaster.broadcast(session.getRoomCode(), MessageType.GAME_ENDED,
                 new GameEndedMessage(winnerTeam, reason));
     }
 
+    // 새 턴 알림 + 턴 타이머 시작 (start는 이전 타이머를 취소하고 새로 건다)
     private void broadcastTurnChanged(GameSession session) {
+        turnTimerService.start(session.getRoomCode(), session.getCurrentTeam());
         broadcaster.broadcast(session.getRoomCode(), MessageType.TURN_CHANGED,
                 new TurnChangedMessage(session.getCurrentTeam(), session.getRemainingThrows(),
-                        toSeconds(gameProperties.turnTimeLimit()), session.getTurnNumber()));
+                        turnTimerService.limitSec(TimerType.TURN), session.getTurnNumber()));
     }
 
     private void sendToTeam(GameSession session, int team, MessageType type, Object payload) {
@@ -280,9 +346,5 @@ public class GameService {
             throw new ForbiddenException(NOT_YOUR_TURN, "내 차례가 아닙니다.");
         }
         return team;
-    }
-
-    private static int toSeconds(Duration duration) {
-        return (int) duration.toSeconds();
     }
 }

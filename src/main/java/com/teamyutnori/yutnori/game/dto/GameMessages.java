@@ -1,7 +1,6 @@
 package com.teamyutnori.yutnori.game.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.teamyutnori.yutnori.game.model.GameEndReason;
 import com.teamyutnori.yutnori.game.yut.YutResult;
 
 import java.util.List;
@@ -24,6 +23,5 @@ public final class GameMessages {
     // AUGMENT_SELECTED  방 전체에 보낸다
     public record AugmentSelectedMessage(int team, String augmentId, boolean autoSelected) {}
 
-    // GAME_ENDED
-    public record GameEndedMessage(int winnerTeam, GameEndReason reason) {}
+    // GAME_ENDED는 재접속 담당과 같이 쓰도록 ws/dto/WsMessages.GameEndedMessage를 사용한다
 }
