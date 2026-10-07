@@ -8,4 +8,12 @@ public final class WsMessages {
     public record ErrorMessage(String code, String message) {}
     public record PlayerDisconnectedMessage(String playerId, int graceSec) {}
     public record PlayerReconnectedMessage(String playerId) {}
+    public record GameEndedMessage(int winnerTeam, GameEndReason reason){}
+
+    public enum GameEndReason{
+        FINISHED,
+        FORFEIT,
+        DISCONNECTED
+    }
+
 }
