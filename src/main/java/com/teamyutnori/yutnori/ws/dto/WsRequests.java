@@ -5,4 +5,5 @@ public final class WsRequests {
     private WsRequests() {}
 
     public record PingMessage(long clientTime) {}
+    public record StateHashReport(long seq, String stateHash) {}
 }
