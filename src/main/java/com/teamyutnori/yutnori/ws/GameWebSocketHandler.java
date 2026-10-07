@@ -1,5 +1,6 @@
 package com.teamyutnori.yutnori.ws;
 
+import com.teamyutnori.yutnori.reconnect.ConnectionCleanup;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -15,11 +16,13 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     private final RoomSessionRegistry registry;
     private final MessageRouter router;
+    private final ConnectionCleanup connectionCleanup;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         WsMessageContext context = WsMessageContext.from(session);
         registry.register(context.roomCode(), context.playerId(), session);
+        connectionCleanup.onConnected(context);
         log.info("WS 연결 room={} player={}", context.roomCode(), context.playerId());
     }
 
@@ -34,6 +37,6 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         registry.unregister(context.roomCode(), context.playerId(), session);
         log.info("WS 종료 room={} player={} status={}",
                 context.roomCode(), context.playerId(), status);
-        // TODO: 7번 ConnectionCleanup - 방에 연결 끊김 알림, 재접속 대기 처리
+        connectionCleanup.onDisconnected(context);
     }
 }
