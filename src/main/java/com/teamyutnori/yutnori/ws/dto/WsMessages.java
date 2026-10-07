@@ -1,5 +1,7 @@
 package com.teamyutnori.yutnori.ws.dto;
 
+import com.teamyutnori.yutnori.game.model.GameEndReason;
+
 // 서버 → 클라이언트 메시지 payload 모음
 public final class WsMessages {
     private WsMessages() {}
@@ -9,11 +11,5 @@ public final class WsMessages {
     public record PlayerDisconnectedMessage(String playerId, int graceSec) {}
     public record PlayerReconnectedMessage(String playerId) {}
     public record GameEndedMessage(int winnerTeam, GameEndReason reason){}
-
-    public enum GameEndReason{
-        FINISHED,
-        FORFEIT,
-        DISCONNECTED
-    }
 
 }

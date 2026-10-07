@@ -1,5 +1,6 @@
 package com.teamyutnori.yutnori.reconnect;
 
+import com.teamyutnori.yutnori.game.model.GameEndReason;
 import com.teamyutnori.yutnori.ws.RoomBroadcaster;
 import com.teamyutnori.yutnori.ws.dto.MessageType;
 import com.teamyutnori.yutnori.ws.dto.WsMessages;
@@ -45,7 +46,7 @@ public class DisconnectTimeoutHandler {
 
         int winnerTeam = 1 - loserTeam.get();
         game.endGame(roomCode, winnerTeam);
-        broadcaster.broadcast(roomCode, MessageType.GAME_ENDED, new WsMessages.GameEndedMessage(winnerTeam, WsMessages.GameEndReason.DISCONNECTED));
+        broadcaster.broadcast(roomCode, MessageType.GAME_ENDED, new WsMessages.GameEndedMessage(winnerTeam, GameEndReason.DISCONNECTED));
 
         turnTimerService.cancel(roomCode);
         connectionCleanup.clearRoom(roomCode);
