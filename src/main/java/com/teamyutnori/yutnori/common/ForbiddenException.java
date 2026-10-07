@@ -1,14 +1,7 @@
 package com.teamyutnori.yutnori.common;
 
-import lombok.Getter;
-
-@Getter
-public class ForbiddenException extends RuntimeException {
-
-    private final String code;
-
+public class ForbiddenException extends BusinessException {
     public ForbiddenException(String code, String message) {
-        super(message);
-        this.code = code;
+        super(code, message);
     }
 }

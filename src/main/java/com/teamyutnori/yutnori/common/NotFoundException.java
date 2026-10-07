@@ -1,14 +1,7 @@
 package com.teamyutnori.yutnori.common;
 
-import lombok.Getter;
-
-@Getter
-public class NotFoundException extends RuntimeException {
-
-    private final String code;
-
+public class NotFoundException extends BusinessException {
     public NotFoundException(String code, String message) {
-        super(message);
-        this.code = code;
+        super(code, message);
     }
 }
