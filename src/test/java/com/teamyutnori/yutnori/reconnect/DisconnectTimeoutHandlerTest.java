@@ -1,8 +1,9 @@
 package com.teamyutnori.yutnori.reconnect;
 
+import com.teamyutnori.yutnori.game.model.GameEndReason;
 import com.teamyutnori.yutnori.ws.RoomBroadcaster;
 import com.teamyutnori.yutnori.ws.dto.MessageType;
-import com.teamyutnori.yutnori.ws.dto.WsMessages.GameEndReason;
+
 import com.teamyutnori.yutnori.ws.dto.WsMessages.GameEndedMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
