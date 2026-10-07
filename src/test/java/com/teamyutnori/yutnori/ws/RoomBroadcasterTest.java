@@ -114,4 +114,52 @@ class RoomBroadcasterTest {
         broadcaster.sendTo(ROOM, "nobody", MessageType.PONG, new PongMessage(1, 2));
         // 예외 없이 끝나면 통과
     }
+
+    @Test
+    void broadcast는_붙인_seq를_반환한다() throws IOException {
+        WebSocketSession s1 = openSession("s1");
+        registry.register(ROOM, "p1", s1);
+
+        long first = broadcaster.broadcast(ROOM, MessageType.TURN_CHANGED, null);
+        assertEquals(1, first);
+        assertEquals(first, lastSent(s1).get("seq").asLong());
+
+        long second = broadcaster.broadcast(ROOM, MessageType.TURN_CHANGED, null);
+        assertEquals(2, second);
+        assertEquals(second, lastSent(s1).get("seq").asLong());
+    }
+
+    @Test
+    void resendTo는_넘긴_seq를_그대로_붙여_한_명에게만_보낸다() throws IOException {
+        WebSocketSession s1 = openSession("s1");
+        WebSocketSession s2 = openSession("s2");
+        registry.register(ROOM, "p1", s1);
+        registry.register(ROOM, "p2", s2);
+
+        broadcaster.resendTo(ROOM, "p1", MessageType.TURN_CHANGED, 5, null);
+
+        JsonNode expected = objectMapper.readTree(
+                "{\"type\":\"TURN_CHANGED\",\"seq\":5,\"payload\":{}}");
+        assertEquals(expected, lastSent(s1));
+        verify(s2, never()).sendMessage(any());
+    }
+
+    @Test
+    void resendTo는_방_seq를_증가시키지_않는다() throws IOException {
+        WebSocketSession s1 = openSession("s1");
+        registry.register(ROOM, "p1", s1);
+
+        broadcaster.broadcast(ROOM, MessageType.TURN_CHANGED, null);
+        broadcaster.resendTo(ROOM, "p1", MessageType.TURN_CHANGED, 1, null);
+        long next = broadcaster.broadcast(ROOM, MessageType.TURN_CHANGED, null);
+
+        assertEquals(2, next);
+        assertEquals(2, lastSent(s1).get("seq").asLong());
+    }
+
+    @Test
+    void 없는_플레이어에게_resendTo하면_아무것도_하지_않는다() {
+        broadcaster.resendTo(ROOM, "nobody", MessageType.TURN_CHANGED, 1, null);
+        // 예외 없이 끝나면 통과
+    }
 }

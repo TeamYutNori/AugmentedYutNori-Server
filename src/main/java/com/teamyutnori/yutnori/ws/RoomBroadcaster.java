@@ -23,18 +23,26 @@ public class RoomBroadcaster {
     private final SequenceTracker sequenceTracker;
     private final ObjectMapper objectMapper;
 
-    // 방 전체에 보낸다. 방 seq를 1 증가시켜 붙인다
-    public void broadcast(String roomCode, MessageType type, Object payload) {
+    // 방 전체에 보낸다. 방 seq를 1 증가시켜 붙인 seq를 반환한다
+    public long broadcast(String roomCode, MessageType type, Object payload) {
         long seq = sequenceTracker.next(roomCode);
         TextMessage textMessage = toMessage(type, seq, payload);
         for (WebSocketSession session : registry.getSessions(roomCode)) {
             send(session, textMessage);
         }
+        return seq;
     }
 
     // 한 명에게만 보낸다 (PONG, ERROR 등). seq는 0 = 순서 검사 대상 아님
     public void sendTo(String roomCode, String playerId, MessageType type, Object payload) {
         TextMessage textMessage = toMessage(type, 0, payload);
+        Optional<WebSocketSession> session = registry.find(roomCode, playerId);
+        session.ifPresent(foundSession -> send(foundSession, textMessage));
+    }
+
+    // 재접속한 한 명에게 이미 보냈던 메시지를 원래 seq로 다시 보낸다. 방 seq는 증가시키지 않는다
+    public void resendTo(String roomCode, String playerId, MessageType type, long seq, Object payload) {
+        TextMessage textMessage = toMessage(type, seq, payload);
         Optional<WebSocketSession> session = registry.find(roomCode, playerId);
         session.ifPresent(foundSession -> send(foundSession, textMessage));
     }
