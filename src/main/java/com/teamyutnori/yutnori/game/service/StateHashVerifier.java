@@ -1,5 +1,7 @@
 package com.teamyutnori.yutnori.game.service;
 
+import com.teamyutnori.yutnori.common.ConflictException;
+import com.teamyutnori.yutnori.common.InvalidRequestException;
 import org.springframework.stereotype.Component;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -52,7 +54,7 @@ public class StateHashVerifier {
             Map<String, String> hashes = room.pending.computeIfAbsent(seq, k -> new LinkedHashMap<>());
             String previous = hashes.get(playerId);
             if(previous != null && !previous.equals(hash)){
-                throw new IllegalStateException("플레이어 " + playerId + "가 seq" + seq + "에에 다른 해시를 다시 보냈습니다. (" + previous + " → " + hash + ")");
+                throw new ConflictException("STATE_HASH_CONFLICT", "플레이어 " + playerId + "가 seq" + seq + "에에 다른 해시를 다시 보냈습니다. (" + previous + " → " + hash + ")");
 
             }
             hashes.put(playerId, hash);
@@ -82,10 +84,10 @@ public class StateHashVerifier {
     }
 
     private static String normalize(String stateHash){
-        if(stateHash == null) throw new IllegalArgumentException("stateHash가 비어있습니다.");
+        if(stateHash == null) throw new InvalidRequestException("INVALID_STATE_HASH", "stateHash가 비어있습니다.");
         String hash = stateHash.trim().toLowerCase();
         if(!HASH_FORMAT.matcher(hash).matches()){
-            throw new IllegalArgumentException("stateHash는 16자리 hex 문자열이어야 합니다. (현재 '" + stateHash + "')");
+            throw new InvalidRequestException("INVALID_STATE_HASH", "stateHash는 16자리 hex 문자열이어야 합니다. (현재 '" + stateHash + "')");
         }
         return hash;
     }

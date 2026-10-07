@@ -1,5 +1,7 @@
 package com.teamyutnori.yutnori.game.service;
 
+import com.teamyutnori.yutnori.common.ConflictException;
+import com.teamyutnori.yutnori.common.InvalidRequestException;
 import com.teamyutnori.yutnori.game.service.StateHashVerifier.Result;
 import com.teamyutnori.yutnori.game.service.StateHashVerifier.Status;
 import org.junit.jupiter.api.BeforeEach;
@@ -88,15 +90,6 @@ class StateHashVerifierTest {
         assertThat(result.hashes()).hasSize(1);
     }
 
-    // 같은 플레이어가 다른 해시를 다시 보내면 예외 (클라이언트 버그)
-    @Test
-    void duplicateDifferent() {
-        verifier.submit(ROOM, 1, "p1", HASH_A, 2);
-
-        assertThatThrownBy(() -> verifier.submit(ROOM, 1, "p1", HASH_B, 2))
-                .isInstanceOf(IllegalStateException.class);
-    }
-
     // 이미 판정이 끝난 seq에 늦게 온 해시는 기존 결과를 그대로 돌려준다
     @Test
     void lateSubmit() {
@@ -109,17 +102,6 @@ class StateHashVerifierTest {
         assertThat(verifier.pendingCount(ROOM)).isZero();
     }
 
-    // 16자리 hex가 아니거나 null이면 예외
-    @Test
-    void invalidHash() {
-        assertThatThrownBy(() -> verifier.submit(ROOM, 1, "p1", "1234", 2))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> verifier.submit(ROOM, 1, "p1", "zzzzzzzzzzzzzzzz", 2))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> verifier.submit(ROOM, 1, "p1", null, 2))
-                .isInstanceOf(IllegalArgumentException.class);
-    }
-
     // clearRoom 후에는 대기 중이던 해시가 사라지고 처음부터 다시 모은다
     @Test
     void clearRoom() {
@@ -128,5 +110,34 @@ class StateHashVerifierTest {
 
         assertThat(verifier.pendingCount(ROOM)).isZero();
         assertThat(verifier.submit(ROOM, 1, "p2", HASH_A, 2).status()).isEqualTo(Status.PENDING);
+    }
+
+    // 같은 플레이어가 다른 해시를 다시 보내면 STATE_HASH_CONFLICT
+    @Test
+    void duplicateDifferent() {
+        verifier.submit(ROOM, 1, "p1", HASH_A, 2);
+
+        assertThatThrownBy(() -> verifier.submit(ROOM, 1, "p1", HASH_B, 2))
+                .isInstanceOf(ConflictException.class)
+                .extracting("code").isEqualTo("STATE_HASH_CONFLICT");
+    }
+
+    // 16자리 hex가 아니거나 null이면 INVALID_STATE_HASH
+    @Test
+    void invalidHash() {
+        assertThatThrownBy(() -> verifier.submit(ROOM, 1, "p1", "1234", 2))
+                .isInstanceOf(InvalidRequestException.class)
+                .extracting("code").isEqualTo("INVALID_STATE_HASH");
+        assertThatThrownBy(() -> verifier.submit(ROOM, 1, "p1", "zzzzzzzzzzzzzzzz", 2))
+                .isInstanceOf(InvalidRequestException.class);
+        assertThatThrownBy(() -> verifier.submit(ROOM, 1, "p1", null, 2))
+                .isInstanceOf(InvalidRequestException.class);
+    }
+
+    // 인원이 2 미만이면 서버 호출 실수라 기본 예외
+    @Test
+    void invalidExpectedPlayers() {
+        assertThatThrownBy(() -> verifier.submit(ROOM, 1, "p1", HASH_A, 1))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }
