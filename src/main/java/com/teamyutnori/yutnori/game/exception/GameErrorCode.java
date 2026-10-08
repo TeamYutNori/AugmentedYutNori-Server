@@ -16,4 +16,6 @@ public final class GameErrorCode {
     public static final String RETHROW_NOT_ALLOWED      = "RETHROW_NOT_ALLOWED";       // InvalidRequest
     public static final String INVALID_MOVE_RESULT      = "INVALID_MOVE_RESULT";       // InvalidRequest
     public static final String CANNOT_PASS_TURN         = "CANNOT_PASS_TURN";          // InvalidRequest
+    public static final String INVALID_PIECE            = "INVALID_PIECE";
+    public static final String INVALID_MOVE_REPORT      = "INVALID_MOVE_REPORT";
 }
