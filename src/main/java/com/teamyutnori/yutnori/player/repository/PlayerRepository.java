@@ -7,9 +7,15 @@ import java.util.Optional;
 
 public interface PlayerRepository extends JpaRepository<Player, Long> {
 
-    // WebSocket 연결 시 게스트 토큰으로 플레이어 조회
+    // Firebase UID로 기존 Player 조회
+    Optional<Player> findByFirebaseUid(String firebaseUid);
+
+    // 게임 내부 playerId로 Player 조회
+    Optional<Player> findByPlayerId(String playerId);
+
+    // 게스트 토큰으로 Player 조회
     Optional<Player> findByGuestToken(String guestToken);
 
-    // playerId로 플레이어 조회
-    Optional<Player> findByPlayerId(String playerId);
+    // 닉네임 중복 확인
+    boolean existsByNickname(String nickname);
 }
