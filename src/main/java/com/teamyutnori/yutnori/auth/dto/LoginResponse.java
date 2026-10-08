@@ -1,4 +1,8 @@
 package com.teamyutnori.yutnori.auth.dto;
 
-public class LoginResponse {
+public record LoginResponse(
+        String playerId,
+        String nickname,
+        String token
+) {
 }
