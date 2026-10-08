@@ -20,7 +20,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(webSocketHandler, properties.path())
-                .setAllowedOrigins(properties.allowedOrigins().toArray(String[]::new));
-        // TODO: 5번 GuestTokenHandshakeInterceptor 완성 후 .addInterceptors(...) 연결
+                .setAllowedOriginPatterns(properties.allowedOrigins().toArray(String[]::new));
+        // TODO: AuthHandshakeInterceptor(형호) 완성 후 .addInterceptors(...) 연결
     }
 }

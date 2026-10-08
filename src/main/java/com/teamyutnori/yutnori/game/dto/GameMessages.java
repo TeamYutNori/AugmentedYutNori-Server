@@ -23,5 +23,8 @@ public final class GameMessages {
     // AUGMENT_SELECTED  방 전체에 보낸다
     public record AugmentSelectedMessage(int team, String augmentId, boolean autoSelected) {}
 
+    // MOVE_APPLIED 방 전체에 보낸다
+    public record MoveAppliedMessage(int team, int pieceId, int moveCount, int destinationNodeId, String stateHash) {}
+
     // GAME_ENDED는 재접속 담당과 같이 쓰도록 ws/dto/WsMessages.GameEndedMessage를 사용한다
 }

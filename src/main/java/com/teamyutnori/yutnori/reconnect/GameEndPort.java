@@ -12,4 +12,8 @@ public interface GameEndPort {
 
     // 게임 종료(phase = ENDED, winnerTeam 설정)
     void endGame(String roomCode, int winnerTeam);
+
+    default boolean removePlayer(String roomCode, String playerId) {
+        return false;
+    }
 }

@@ -69,21 +69,32 @@ class ConnectionCleanupTest {
         assertThat(cleanup.isWaiting(ROOM, "p1")).isTrue();
     }
 
+    // 끊기면 GameService에 알리는 PlayerDisconnectedEvent가 바로 발행된다
+    @Test
+    void disconnectEvent() {
+        cleanup.onDisconnected(p1);
+
+        assertThat(count(PlayerDisconnectedEvent.class)).isEqualTo(1);
+        PlayerDisconnectedEvent event = first(PlayerDisconnectedEvent.class);
+        assertThat(event.roomCode()).isEqualTo(ROOM);
+        assertThat(event.playerId()).isEqualTo("p1");
+    }
+
     // 대기 시간이 지나면 DisconnectTimeoutEvent가 발행된다
     @Test
     void timeout() throws InterruptedException {
         cleanup.onDisconnected(p1);
 
-        waitFor(1, Duration.ofSeconds(1));
+        waitFor(DisconnectTimeoutEvent.class, 1, Duration.ofSeconds(1));
 
-        assertThat(events).hasSize(1);
-        DisconnectTimeoutEvent event = (DisconnectTimeoutEvent) events.get(0);
+        assertThat(count(DisconnectTimeoutEvent.class)).isEqualTo(1);
+        DisconnectTimeoutEvent event = first(DisconnectTimeoutEvent.class);
         assertThat(event.roomCode()).isEqualTo(ROOM);
         assertThat(event.playerId()).isEqualTo("p1");
         assertThat(cleanup.isWaiting(ROOM, "p1")).isFalse();
     }
 
-    // 대기 중에 다시 연결되면 이벤트 없이 PLAYER_RECONNECTED를 알린다
+    // 대기 중에 다시 연결되면 시간 초과 없이 PLAYER_RECONNECTED 알림과 PlayerReconnectedEvent가 나간다
     @Test
     void reconnect() throws InterruptedException {
         cleanup.onDisconnected(p1);
@@ -91,17 +102,20 @@ class ConnectionCleanupTest {
 
         Thread.sleep(300);
 
-        assertThat(events).isEmpty();
+        assertThat(count(DisconnectTimeoutEvent.class)).isZero();
+        assertThat(count(PlayerReconnectedEvent.class)).isEqualTo(1);
+        assertThat(first(PlayerReconnectedEvent.class).playerId()).isEqualTo("p1");
         verify(broadcaster).broadcast(eq(ROOM), eq(MessageType.PLAYER_RECONNECTED), any());
         assertThat(cleanup.isWaiting(ROOM, "p1")).isFalse();
     }
 
-    // 처음 연결은 아무것도 알리지 않는다
+    // 처음 연결은 아무것도 알리지 않고 이벤트도 없다
     @Test
     void firstConnect() {
         cleanup.onConnected(p1);
 
         verifyNoInteractions(broadcaster);
+        assertThat(events).isEmpty();
     }
 
     // 재접속 후 옛 세션 종료가 늦게 오면 (새 세션이 남아 있으면) 무시한다
@@ -112,10 +126,11 @@ class ConnectionCleanupTest {
         cleanup.onDisconnected(p1);
 
         verifyNoInteractions(broadcaster);
+        assertThat(events).isEmpty();
         assertThat(cleanup.isWaiting(ROOM, "p1")).isFalse();
     }
 
-    // 스스로 나가서 cancel하면 이벤트도, 재접속 알림도 없다
+    // 스스로 나가서 cancel하면 시간 초과도, 재접속 알림도 없다
     @Test
     void cancel() throws InterruptedException {
         cleanup.onDisconnected(p1);
@@ -123,7 +138,8 @@ class ConnectionCleanupTest {
 
         Thread.sleep(300);
 
-        assertThat(events).isEmpty();
+        assertThat(count(DisconnectTimeoutEvent.class)).isZero();
+        assertThat(count(PlayerReconnectedEvent.class)).isZero();
         verify(broadcaster, never()).broadcast(any(), eq(MessageType.PLAYER_RECONNECTED), any());
     }
 
@@ -136,28 +152,40 @@ class ConnectionCleanupTest {
 
         Thread.sleep(300);
 
-        assertThat(events).isEmpty();
+        assertThat(count(DisconnectTimeoutEvent.class)).isZero();
         assertThat(cleanup.isWaiting(ROOM, "p1")).isFalse();
         assertThat(cleanup.isWaiting(ROOM, "p2")).isFalse();
     }
 
-    // 플레이어마다 따로 기다린다
+    // 플레이어마다 따로 기다린다 (p1은 돌아오고 p2만 시간 초과)
     @Test
     void separatePlayer() throws InterruptedException {
         cleanup.onDisconnected(p1);
         cleanup.onDisconnected(p2);
         cleanup.onConnected(p1);
 
-        waitFor(1, Duration.ofSeconds(1));
+        waitFor(DisconnectTimeoutEvent.class, 1, Duration.ofSeconds(1));
         Thread.sleep(100);
 
-        assertThat(events).hasSize(1);
-        assertThat(((DisconnectTimeoutEvent) events.get(0)).playerId()).isEqualTo("p2");
+        assertThat(count(DisconnectTimeoutEvent.class)).isEqualTo(1);
+        assertThat(first(DisconnectTimeoutEvent.class).playerId()).isEqualTo("p2");
+        assertThat(count(PlayerDisconnectedEvent.class)).isEqualTo(2);
+        assertThat(count(PlayerReconnectedEvent.class)).isEqualTo(1);
     }
 
-    private void waitFor(int count, Duration timeout) throws InterruptedException {
+    // ── 헬퍼: 이벤트 종류별로 세기 ──
+
+    private long count(Class<?> type) {
+        return events.stream().filter(type::isInstance).count();
+    }
+
+    private <T> T first(Class<T> type) {
+        return events.stream().filter(type::isInstance).map(type::cast).findFirst().orElseThrow();
+    }
+
+    private void waitFor(Class<?> type, int expected, Duration timeout) throws InterruptedException {
         long end = System.currentTimeMillis() + timeout.toMillis();
-        while (events.size() < count && System.currentTimeMillis() < end) {
+        while (count(type) < expected && System.currentTimeMillis() < end) {
             Thread.sleep(10);
         }
     }

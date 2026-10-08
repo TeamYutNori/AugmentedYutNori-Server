@@ -35,6 +35,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
     } // 방장이 아닌데 시작 요청, 내 턴이 아님 (HTTP 상태: 403)
 
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ErrorResponse> unauthorizedHandler(UnauthorizedException e) {
+        ErrorResponse error = new ErrorResponse(e.getCode(), e.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+    } // 로그인 실패(아이디·비밀번호 불일치), 토큰 없음·만료·위조 (HTTP 상태: 401)
+
     @ExceptionHandler(InvalidRequestException.class)
     public ResponseEntity<ErrorResponse> invalidRequestHandler(InvalidRequestException e) {
         ErrorResponse error = new ErrorResponse(e.getCode(), e.getMessage());
