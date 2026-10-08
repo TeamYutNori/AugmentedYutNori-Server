@@ -63,6 +63,7 @@ public class ConnectionCleanup {
 
         int graceSec = (int) gameProperties.reconnectGrace().toSeconds();
         broadcaster.broadcast(roomCode, MessageType.PLAYER_DISCONNECTED, new PlayerDisconnectedMessage(playerId, graceSec));
+        publisher.publishEvent(new PlayerDisconnectedEvent(roomCode, playerId));
         log.info("재접속 대기 시작 room={}, player={}, grace={}s", roomCode, playerId, graceSec);
     }
 
@@ -75,6 +76,7 @@ public class ConnectionCleanup {
 
         if(wasWaiting){
             broadcaster.broadcast(context.roomCode(), MessageType.PLAYER_RECONNECTED, new PlayerReconnectedMessage(context.playerId()));
+            publisher.publishEvent(new PlayerReconnectedEvent(context.roomCode(), context.playerId()));
             log.info("재접속 room={}, player={}", context.roomCode(), context.playerId());
         }
     }
