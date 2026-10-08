@@ -36,7 +36,6 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
     implementation 'me.paulschwarz:springboot4-dotenv:5.1.0'
-    implementation 'org.springframework.security:spring-security-crypto'
 }
 
 tasks.named('test') {
