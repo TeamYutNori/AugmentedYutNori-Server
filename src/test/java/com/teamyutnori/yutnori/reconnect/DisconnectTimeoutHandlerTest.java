@@ -114,4 +114,24 @@ class DisconnectTimeoutHandlerTest {
 
         verifyNoInteractions(broadcaster);
     }
+
+    // removePlayer가 구현돼 있으면 제거만 하고, 직접 GAME_ENDED를 보내지 않는다
+    @Test
+    void removePlayer() {
+        FakeGame removing = new FakeGame() {
+            String removed;
+            @Override
+            public boolean removePlayer(String roomCode, String playerId) {
+                removed = playerId;
+                return true;
+            }
+        };
+        DisconnectTimeoutHandler h = new DisconnectTimeoutHandler(
+                Optional.of(removing), broadcaster, turnTimerService, connectionCleanup);
+
+        h.onDisconnectTimeout(new DisconnectTimeoutEvent(ROOM, "p1"));
+
+        assertThat(removing.endedWinner).isNull();
+        verifyNoInteractions(broadcaster, turnTimerService, connectionCleanup);
+    }
 }
