@@ -17,7 +17,7 @@ public record WsMessageContext(
         String playerId = (String)session.getAttributes().get(ATTR_PLAYER_ID);
         String nickname = (String)session.getAttributes().get(ATTR_NICKNAME);
 
-        // TODO: GuestTokenHandshakeInterceptor 완성 후 제거
+        // TODO: AuthHandshakeInterceptor 완성 후 제거
         if (roomCode == null) {
             String path = session.getUri().getPath();
             roomCode = path.substring(path.lastIndexOf('/') + 1);
