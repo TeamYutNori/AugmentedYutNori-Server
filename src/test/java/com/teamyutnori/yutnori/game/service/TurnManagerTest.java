@@ -1,6 +1,7 @@
 package com.teamyutnori.yutnori.game.service;
 
 import com.teamyutnori.yutnori.common.InvalidRequestException;
+import com.teamyutnori.yutnori.game.board.MoveResult;
 import com.teamyutnori.yutnori.game.board.TestBoards;
 import com.teamyutnori.yutnori.game.model.GameSession;
 import com.teamyutnori.yutnori.game.model.GameSetup;
@@ -84,6 +85,57 @@ class TurnManagerTest {
     void rejectUnknownMoveCount() {
         turnManager.applyThrow(session, YutResult.Gae);
         assertThrows(InvalidRequestException.class, () -> turnManager.afterMove(session, 3, 0, false));
+    }
+
+    // ── 판(BoardState)으로 계산하는 턴 처리 ──
+    // 기본 판: 0 출발 / 1~4 바깥길. 팀 0 말 = 0, 1 / 팀 1 말 = 100, 101
+
+    @Test
+    @DisplayName("판에 말이 없는데 빽도만 나오면 바로 다음 팀")
+    void backDoWithNoPieceOnBoardEndsTurn() {
+        turnManager.applyThrow(session, YutResult.BackDo);
+        assertTrue(turnManager.endTurnIfNoAction(session));
+        assertEquals(1, session.getCurrentTeam());
+    }
+
+    @Test
+    @DisplayName("움직일 수 있는 결과가 있으면 던진 뒤에도 턴 유지")
+    void keepTurnWhenMovable() {
+        turnManager.applyThrow(session, YutResult.Gae);
+        assertFalse(turnManager.endTurnIfNoAction(session));
+        assertEquals(0, session.getCurrentTeam());
+    }
+
+    @Test
+    @DisplayName("서버가 계산한 이동 결과: 잡으면 한 번 더 던질 수 있어 턴 유지")
+    void afterMoveWithCapture() {
+        session.getBoardState().tryMove(100, 2, 2);   // 상대 말을 2번 칸에 미리 둔다
+        turnManager.applyThrow(session, YutResult.Gae);
+
+        MoveResult result = session.getBoardState().tryMove(0, 2, 2).orElseThrow();
+        assertEquals(1, result.capturedCount());
+        assertFalse(turnManager.afterMove(session, result));
+        assertEquals(1, session.getRemainingThrows());
+        assertTrue(session.getStoredResults().isEmpty());
+    }
+
+    @Test
+    @DisplayName("서버가 계산한 이동 결과: 결과를 다 쓰면 다음 팀")
+    void afterMoveEndsTurn() {
+        turnManager.applyThrow(session, YutResult.Gae);
+        MoveResult result = session.getBoardState().tryMove(0, 2, 2).orElseThrow();
+        assertTrue(turnManager.afterMove(session, result));
+        assertEquals(1, session.getCurrentTeam());
+    }
+
+    @Test
+    @DisplayName("남은 결과가 빽도뿐이어도 판 위 말이 있으면 턴 유지")
+    void remainingBackDoWithPieceOnBoard() {
+        turnManager.applyThrow(session, YutResult.Mo);       // 한 번 더
+        turnManager.applyThrow(session, YutResult.BackDo);   // 던지기 끝
+        MoveResult result = session.getBoardState().tryMove(0, 5, 5).orElseThrow();
+        assertFalse(turnManager.afterMove(session, result), "5번 칸 말이 빽도로 움직일 수 있음");
+        assertEquals(List.of(YutResult.BackDo), session.getStoredResults());
     }
 
     @Test

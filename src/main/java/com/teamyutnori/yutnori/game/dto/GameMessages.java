@@ -1,6 +1,8 @@
 package com.teamyutnori.yutnori.game.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.teamyutnori.yutnori.game.board.MoveResult;
+import com.teamyutnori.yutnori.game.board.Piece;
 import com.teamyutnori.yutnori.game.yut.YutResult;
 
 import java.util.List;
@@ -13,6 +15,27 @@ public final class GameMessages {
     // isRethrow: boolean 이름이 is로 시작하면 Jackson이 "rethrow"로 바꿔 내보낼 수 있어서 JSON 이름을 고정한다 (Unity 필드명 isRethrow)
     public record ThrowResultMessage(int team, boolean[] sticks, YutResult result,
                                      @JsonProperty("isRethrow") boolean isRethrow) {}
+
+    // MOVE_APPLIED  서버가 확정한 이동. 방 전체에 보낸다
+    //  - movedPieceIds: 같이 움직인 말 (업힌 말 포함), capturedPieceIds: 잡혀서 대기석으로 간 말 → 클라 연출용
+    //  - isFinished: 움직인 말이 완주했는지
+    //  - stateHash: 이동한 쪽이 보낸 해시 (다른 기기는 재계산 후 비교해서 desync 확인)
+    public record MoveAppliedMessage(int team, int pieceId, int moveCount, int destinationNodeId,
+                                     List<Integer> movedPieceIds, List<Integer> capturedPieceIds,
+                                     @JsonProperty("isFinished") boolean isFinished, String stateHash) {
+
+        public static MoveAppliedMessage of(int team, MoveResult result, String stateHash) {
+            return new MoveAppliedMessage(
+                    team,
+                    result.piece().getId(),
+                    result.moveCount(),
+                    result.path().destination().getId(),
+                    result.movedPieces().stream().map(Piece::getId).toList(),
+                    result.capturedPieces().stream().map(Piece::getId).toList(),
+                    result.finished(),
+                    stateHash);
+        }
+    }
 
     // TURN_CHANGED  turnNumber: 새 턴마다 1씩 증가하는 턴 번호
     public record TurnChangedMessage(int team, int remainingThrows, int turnTimeLimitSec, int turnNumber) {}
