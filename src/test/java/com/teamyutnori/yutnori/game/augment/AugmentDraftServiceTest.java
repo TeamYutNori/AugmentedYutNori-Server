@@ -1,5 +1,6 @@
 package com.teamyutnori.yutnori.game.augment;
 
+import com.teamyutnori.yutnori.game.board.TestBoards;
 import com.teamyutnori.yutnori.game.model.GameSession;
 import com.teamyutnori.yutnori.game.model.GameSetup;
 import com.teamyutnori.yutnori.game.yut.SequenceRandomProvider;
@@ -19,7 +20,7 @@ class AugmentDraftServiceTest {
     private final AugmentCatalog catalog = new AugmentCatalog(JsonMapper.builder().build());
 
     private GameSession newSession() {
-        return new GameSession("ROOM", new GameSetup(2, 2, "default", false), Map.of("p0", 0, "p1", 1));
+        return new GameSession("ROOM", new GameSetup(2, 2, "default", false), Map.of("p0", 0, "p1", 1), TestBoards.defaultBoard());
     }
 
     @Test

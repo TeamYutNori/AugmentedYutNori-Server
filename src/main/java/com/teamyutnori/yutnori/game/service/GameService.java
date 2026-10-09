@@ -7,6 +7,8 @@ import com.teamyutnori.yutnori.common.NotFoundException;
 import com.teamyutnori.yutnori.config.GameProperties;
 import com.teamyutnori.yutnori.game.augment.AugmentDraftService;
 import com.teamyutnori.yutnori.game.augment.RethrowValidator;
+import com.teamyutnori.yutnori.game.board.BoardGraph;
+import com.teamyutnori.yutnori.game.board.BoardLayoutRepository;
 import com.teamyutnori.yutnori.game.dto.GameMessages.AugmentChoicesMessage;
 import com.teamyutnori.yutnori.game.dto.GameMessages.AugmentSelectedMessage;
 import com.teamyutnori.yutnori.game.dto.GameMessages.ThrowResultMessage;
@@ -54,12 +56,19 @@ public class GameService implements GameEndPort {
     private final RoomBroadcaster broadcaster;
     private final GameProperties gameProperties;
     private final TurnTimerService turnTimerService;
+    private final BoardLayoutRepository boardLayouts;
 
     // ═══════════ 2번(RoomService) → 게임 시작 ═══════════
 
     // GAME_START 전송 직후 호출. playerTeams: playerId → 팀 번호
     public void startGame(String roomCode, GameSetup setup, Map<String, Integer> playerTeams) {
-        GameSession session = new GameSession(roomCode, setup, playerTeams);
+        // 판 확인 → 이 게임 전용 판 생성 (GameSetup은 값만 들고 있어서 판이 실제로 있는지는 여기서 검사)
+        if (!boardLayouts.exists(setup.boardLayoutId())) {
+            throw new InvalidRequestException(INVALID_BOARD_LAYOUT, "없는 판입니다: " + setup.boardLayoutId());
+        }
+        BoardGraph board = boardLayouts.create(setup.boardLayoutId(), setup.allowSkipShortcut());
+
+        GameSession session = new GameSession(roomCode, setup, playerTeams, board);
         // 확인과 저장을 한 번에: 동시에 두 번 불려도 하나만 성공한다
         if (!sessionRepository.saveIfAbsent(session)) {
             throw new ConflictException(GAME_ALREADY_STARTED, "이미 진행 중인 게임이 있습니다: " + roomCode);
