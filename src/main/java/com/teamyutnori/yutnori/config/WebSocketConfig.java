@@ -1,5 +1,6 @@
 package com.teamyutnori.yutnori.config;
 
+import com.teamyutnori.yutnori.ws.AuthHandshakeInterceptor;
 import com.teamyutnori.yutnori.ws.GameWebSocketHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
@@ -15,12 +16,13 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 public class WebSocketConfig implements WebSocketConfigurer {
 
     private final GameWebSocketHandler webSocketHandler;
+    private final AuthHandshakeInterceptor authHandshakeInterceptor;
     private final WsProperties properties;
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(webSocketHandler, properties.path())
+                .addInterceptors(authHandshakeInterceptor)
                 .setAllowedOriginPatterns(properties.allowedOrigins().toArray(String[]::new));
-        // TODO: AuthHandshakeInterceptor(형호) 완성 후 .addInterceptors(...) 연결
     }
 }
