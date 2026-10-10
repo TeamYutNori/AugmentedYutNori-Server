@@ -89,9 +89,4 @@ public class AugmentCatalog {
         }
         return definition;
     }
-
-    // 1회용 증강인지 (사용 후 보유 목록에서 지워야 하는지)
-    public boolean isConsumable(String id) {
-        return find(id).consumable();
-    }
 }

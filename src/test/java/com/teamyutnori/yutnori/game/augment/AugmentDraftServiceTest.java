@@ -28,8 +28,6 @@ class AugmentDraftServiceTest {
     void catalogLoadsJson() {
         assertEquals(List.of("BackDoSwitch", "QuickStart", "Rethrow", "Shield", "SturdyCarry", "WeakBoost"),
                 catalog.allIds());
-        assertTrue(catalog.isConsumable("Rethrow"));
-        assertFalse(catalog.isConsumable("WeakBoost"));
     }
 
     @Test
