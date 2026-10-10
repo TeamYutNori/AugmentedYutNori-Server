@@ -14,7 +14,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-// 실제 src/main/resources/augments.json(6종)을 읽어서 후보 뽑기를 확인한다
+// 실제 src/main/resources/augments.json(5종)을 읽어서 후보 뽑기를 확인한다
 class AugmentDraftServiceTest {
 
     private final AugmentCatalog catalog = new AugmentCatalog(JsonMapper.builder().build());
@@ -24,9 +24,9 @@ class AugmentDraftServiceTest {
     }
 
     @Test
-    @DisplayName("augments.json을 읽어 6종을 json 순서대로 가진다")
+    @DisplayName("augments.json을 읽어 5종을 json 순서대로 가진다")
     void catalogLoadsJson() {
-        assertEquals(List.of("BackDoSwitch", "QuickStart", "Rethrow", "Shield", "SturdyCarry", "WeakBoost"),
+        assertEquals(List.of("BackDoSwitch", "QuickStart", "Rethrow", "SturdyCarry", "WeakBoost"),
                 catalog.allIds());
     }
 
@@ -45,12 +45,12 @@ class AugmentDraftServiceTest {
     @DisplayName("이미 가진 증강은 후보에서 빠진다")
     void excludesOwned() {
         GameSession session = newSession();
-        session.addAugment(0, "Shield");
+        session.addAugment(0, "QuickStart");
         session.addAugment(0, "Rethrow");
         AugmentDraftService draft = new AugmentDraftService(catalog, new SequenceRandomProvider(0.0));
-        List<String> picked = draft.draft(session, 0, 6);
-        assertEquals(4, picked.size());
-        assertFalse(picked.contains("Shield"));
+        List<String> picked = draft.draft(session, 0, 5);
+        assertEquals(3, picked.size());
+        assertFalse(picked.contains("QuickStart"));
         assertFalse(picked.contains("Rethrow"));
     }
 

@@ -37,14 +37,14 @@ class ReconnectServiceTest {
 
     @BeforeEach
     void setUp() {
-        // 팀 1 차례, 걸·개 결과 보유, 팀 0은 Shield 보유
+        // 팀 1 차례, 걸·개 결과 보유, 팀 0은 SturdyCarry 보유
         session = new GameSession(ROOM, new GameSetup(2, 2, "default", false), Map.of("p0", 0, "p1", 1), TestBoards.defaultBoard());
         session.setPhase(GamePhase.PLAYING);
         session.setCurrentTeam(1);
         session.setRemainingThrows(1);
         session.setTurnNumber(4);
         session.getStoredResults().addAll(List.of(YutResult.Geol, YutResult.Gae));
-        session.addAugment(0, "Shield");
+        session.addAugment(0, "SturdyCarry");
 
         repository = mock(GameSessionRepository.class);
         when(repository.find(ROOM)).thenReturn(Optional.of(session));
@@ -78,7 +78,7 @@ class ReconnectServiceTest {
         assertThat(snapshot.remainingThrows()).isEqualTo(1);
         assertThat(snapshot.turnNumber()).isEqualTo(4);
         assertThat(snapshot.storedResults()).containsExactly(YutResult.Geol, YutResult.Gae);
-        assertThat(snapshot.ownedAugments().get(0)).containsExactly("Shield");
+        assertThat(snapshot.ownedAugments().get(0)).containsExactly("SturdyCarry");
         assertThat(snapshot.winnerTeam()).isNull();
         verify(broadcaster, never()).broadcast(any(), any(), any());
     }
@@ -110,7 +110,7 @@ class ReconnectServiceTest {
     @Test
     void offeredOnlyMine() {
         session.setPhase(GamePhase.AUGMENT_SELECT);
-        session.setOffered(0, List.of("Shield", "Rethrow", "QuickStart"));
+        session.setOffered(0, List.of("Rethrow", "QuickStart"));
         session.setOffered(1, List.of("WeakBoost", "SturdyCarry", "BackDoSwitch"));
 
         service.sendSnapshot(ROOM, "p1");
