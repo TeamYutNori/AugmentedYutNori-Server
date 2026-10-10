@@ -20,4 +20,6 @@ public final class GameErrorCode {
     public static final String THROW_REMAINING          = "THROW_REMAINING";           // InvalidRequest  남은 던지기를 먼저 해야 함
     public static final String NOT_YOUR_PIECE           = "NOT_YOUR_PIECE";            // Forbidden       자기 팀 말이 아님
     public static final String INVALID_MOVE             = "INVALID_MOVE";              // InvalidRequest  판 규칙상 갈 수 없는 칸
+    public static final String INVALID_PIECE            = "INVALID_PIECE";             // InvalidRequest
+    public static final String INVALID_MOVE_REPORT      = "INVALID_MOVE_REPORT";       // InvalidRequest
 }

@@ -18,4 +18,9 @@ public class SequenceTracker {
     public void remove(String roomCode) {
         sequences.remove(roomCode);
     }
+
+    public long current(String roomCode){
+        AtomicLong seq = sequences.get(roomCode);
+        return seq == null ? 0 : seq.get();
+    }
 }

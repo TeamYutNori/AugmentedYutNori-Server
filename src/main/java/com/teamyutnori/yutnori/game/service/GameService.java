@@ -23,6 +23,7 @@ import com.teamyutnori.yutnori.game.model.GameSetup;
 import com.teamyutnori.yutnori.game.repository.GameSessionRepository;
 import com.teamyutnori.yutnori.game.yut.YutThrowOutcome;
 import com.teamyutnori.yutnori.game.yut.YutThrowService;
+import com.teamyutnori.yutnori.reconnect.CommandLog;
 import com.teamyutnori.yutnori.reconnect.GameEndPort;
 import com.teamyutnori.yutnori.reconnect.TimerType;
 import com.teamyutnori.yutnori.reconnect.TurnTimeoutEvent;
@@ -47,6 +48,7 @@ import static com.teamyutnori.yutnori.game.exception.GameErrorCode.*;
 //  - TurnTimerService(재접속·타이머 담당): 턴이 바뀌면 start, 증강 선택 시작 시 startAugmentSelect, 끝나면 cancel
 //    시간이 다 되면 TurnTimeoutEvent를 받아 처리한다 (onTimerExpired)
 //  - GameEndPort(재접속 담당이 정의): 끊김 기권 처리에서 게임 상태 조회·종료에 쓰도록 이 클래스가 구현한다
+//  - CommandLog(재접속 담당): MOVE_APPLIED를 seq와 함께 기록해 재접속 때 다시 보낼 수 있게 한다
 @Service
 @RequiredArgsConstructor
 public class GameService implements GameEndPort {
@@ -60,6 +62,7 @@ public class GameService implements GameEndPort {
     private final GameProperties gameProperties;
     private final TurnTimerService turnTimerService;
     private final BoardLayoutRepository boardLayouts;
+    private final CommandLog commandLog;
 
     // ═══════════ 2번(RoomService) → 게임 시작 ═══════════
 
@@ -226,8 +229,10 @@ public class GameService implements GameEndPort {
                     .orElseThrow(() -> new InvalidRequestException(INVALID_MOVE,
                             "갈 수 없는 칸입니다: 말 " + pieceId + ", " + request.moveCount() + "칸 → " + request.destinationNodeId()));
 
-            broadcaster.broadcast(session.getRoomCode(), MessageType.MOVE_APPLIED,
-                    MoveAppliedMessage.of(team, result, request.stateHash()));
+            // 재접속 시 놓친 이동을 다시 보낼 수 있게 seq와 함께 기록 (재접속 담당 CommandLog)
+            MoveAppliedMessage applied = MoveAppliedMessage.of(team, result, request.stateHash());
+            long seq = broadcaster.broadcast(session.getRoomCode(), MessageType.MOVE_APPLIED, applied);
+            commandLog.append(session.getRoomCode(), seq, MessageType.MOVE_APPLIED, team, applied);
 
             // 팀 말이 전부 들어왔으면 승리 (MVP: 먼저 다 들어온 팀이 이김. 순위 보상은 이후 작업)
             if (session.getBoardState().teamFinished(team)) {

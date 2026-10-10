@@ -40,3 +40,7 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Firebase ###
+secrets/
+*firebase-adminsdk*.json
