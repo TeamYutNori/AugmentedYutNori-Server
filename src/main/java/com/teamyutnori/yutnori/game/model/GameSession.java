@@ -1,5 +1,7 @@
 package com.teamyutnori.yutnori.game.model;
 
+import com.teamyutnori.yutnori.game.board.BoardGraph;
+import com.teamyutnori.yutnori.game.board.BoardState;
 import com.teamyutnori.yutnori.game.yut.YutResult;
 import lombok.Getter;
 import lombok.Setter;
@@ -10,6 +12,8 @@ public class GameSession {
 
     private final String roomCode;
     private final GameSetup setup;  // 팀 수, 말 수, 보드 ID
+    private final BoardGraph board;       // 판 모양 (칸 번호, 연결, 지름길)
+    private final BoardState boardState;  // 모든 말 상태
 
     // ── 참가자 ──
     private final Map<String, Integer> playerTeams; // playerId → 팀 (2번 RoomService가 시작할 때 넘겨줌)
@@ -36,10 +40,13 @@ public class GameSession {
     // ── 결과 ──
     @Setter private Integer winnerTeam;         // 끝나기 전엔 null
 
-    public GameSession(String roomCode, GameSetup setup, Map<String, Integer> playerTeams) {
+    // board: BoardLayoutRepository.create()로 이 게임 전용으로 만든 판 (GameService.startGame에서 넘겨줌)
+    public GameSession(String roomCode, GameSetup setup, Map<String, Integer> playerTeams, BoardGraph board) {
         this.roomCode = roomCode;
         this.setup = setup;
         this.playerTeams = Map.copyOf(playerTeams);
+        this.board = board;
+        this.boardState = new BoardState(board, setup.allPieceIds());   // 모든 말은 대기석에서 시작
         for (int t = 0; t < setup.teamCount(); t++) {
             ownedAugments.put(t, new HashSet<>());
             offeredAugments.put(t, List.of());        // 아직 제시 안 함 = 빈 목록

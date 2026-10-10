@@ -7,8 +7,13 @@ import com.teamyutnori.yutnori.common.NotFoundException;
 import com.teamyutnori.yutnori.config.GameProperties;
 import com.teamyutnori.yutnori.game.augment.AugmentDraftService;
 import com.teamyutnori.yutnori.game.augment.RethrowValidator;
+import com.teamyutnori.yutnori.game.board.BoardGraph;
+import com.teamyutnori.yutnori.game.board.BoardLayoutRepository;
+import com.teamyutnori.yutnori.game.board.MoveResult;
+import com.teamyutnori.yutnori.game.dto.GameRequests.MoveRequest;
 import com.teamyutnori.yutnori.game.dto.GameMessages.AugmentChoicesMessage;
 import com.teamyutnori.yutnori.game.dto.GameMessages.AugmentSelectedMessage;
+import com.teamyutnori.yutnori.game.dto.GameMessages.MoveAppliedMessage;
 import com.teamyutnori.yutnori.game.dto.GameMessages.ThrowResultMessage;
 import com.teamyutnori.yutnori.game.dto.GameMessages.TurnChangedMessage;
 import com.teamyutnori.yutnori.game.model.GameEndReason;
@@ -18,6 +23,7 @@ import com.teamyutnori.yutnori.game.model.GameSetup;
 import com.teamyutnori.yutnori.game.repository.GameSessionRepository;
 import com.teamyutnori.yutnori.game.yut.YutThrowOutcome;
 import com.teamyutnori.yutnori.game.yut.YutThrowService;
+import com.teamyutnori.yutnori.reconnect.CommandLog;
 import com.teamyutnori.yutnori.reconnect.GameEndPort;
 import com.teamyutnori.yutnori.reconnect.TimerType;
 import com.teamyutnori.yutnori.reconnect.TurnTimeoutEvent;
@@ -42,6 +48,7 @@ import static com.teamyutnori.yutnori.game.exception.GameErrorCode.*;
 //  - TurnTimerService(재접속·타이머 담당): 턴이 바뀌면 start, 증강 선택 시작 시 startAugmentSelect, 끝나면 cancel
 //    시간이 다 되면 TurnTimeoutEvent를 받아 처리한다 (onTimerExpired)
 //  - GameEndPort(재접속 담당이 정의): 끊김 기권 처리에서 게임 상태 조회·종료에 쓰도록 이 클래스가 구현한다
+//  - CommandLog(재접속 담당): MOVE_APPLIED를 seq와 함께 기록해 재접속 때 다시 보낼 수 있게 한다
 @Service
 @RequiredArgsConstructor
 public class GameService implements GameEndPort {
@@ -54,12 +61,20 @@ public class GameService implements GameEndPort {
     private final RoomBroadcaster broadcaster;
     private final GameProperties gameProperties;
     private final TurnTimerService turnTimerService;
+    private final BoardLayoutRepository boardLayouts;
+    private final CommandLog commandLog;
 
     // ═══════════ 2번(RoomService) → 게임 시작 ═══════════
 
     // GAME_START 전송 직후 호출. playerTeams: playerId → 팀 번호
     public void startGame(String roomCode, GameSetup setup, Map<String, Integer> playerTeams) {
-        GameSession session = new GameSession(roomCode, setup, playerTeams);
+        // 판 확인 → 이 게임 전용 판 생성 (GameSetup은 값만 들고 있어서 판이 실제로 있는지는 여기서 검사)
+        if (!boardLayouts.exists(setup.boardLayoutId())) {
+            throw new InvalidRequestException(INVALID_BOARD_LAYOUT, "없는 판입니다: " + setup.boardLayoutId());
+        }
+        BoardGraph board = boardLayouts.create(setup.boardLayoutId(), setup.allowSkipShortcut());
+
+        GameSession session = new GameSession(roomCode, setup, playerTeams, board);
         // 확인과 저장을 한 번에: 동시에 두 번 불려도 하나만 성공한다
         if (!sessionRepository.saveIfAbsent(session)) {
             throw new ConflictException(GAME_ALREADY_STARTED, "이미 진행 중인 게임이 있습니다: " + roomCode);
@@ -132,6 +147,11 @@ public class GameService implements GameEndPort {
 
             broadcaster.broadcast(session.getRoomCode(), MessageType.THROW_RESULT,
                     new ThrowResultMessage(team, outcome.sticks(), outcome.result(), false));
+
+            // 더 던질 것도, 움직일 말도 없으면 바로 다음 팀 (예: 판에 말이 없는데 빽도)
+            if (turnManager.endTurnIfNoAction(session)) {
+                broadcastTurnChanged(session);
+            }
         }
     }
 
@@ -152,11 +172,16 @@ public class GameService implements GameEndPort {
 
             broadcaster.broadcast(session.getRoomCode(), MessageType.THROW_RESULT,
                     new ThrowResultMessage(team, outcome.sticks(), outcome.result(), true));
+
+            if (turnManager.endTurnIfNoAction(session)) {
+                broadcastTurnChanged(session);
+            }
         }
     }
 
-    // PASS_TURN  던질 것도 없고 움직일 말도 없을 때 클라이언트가 보낸다 (예: 판 위에 말이 없는데 빽도)
-    // 서버는 말 위치를 모르므로 이 판단은 클라이언트에 맡기고, 남은 던지기가 0인지만 확인한다
+    // PASS_TURN  던질 것도 없고 움직일 말도 없을 때 턴 넘기기
+    // 보통은 던지기 직후 서버가 endTurnIfNoAction으로 알아서 넘긴다. 이건 혹시 남은 경우를 위한 수동 넘김
+    // 서버가 판을 알고 있으므로 "정말 움직일 말이 없는지"까지 확인한다
     public void passTurn(String roomCode, String playerId) {
         GameSession session = getSession(roomCode);
         synchronized (session) {
@@ -165,28 +190,58 @@ public class GameService implements GameEndPort {
             if (session.getRemainingThrows() > 0) {
                 throw new InvalidRequestException(CANNOT_PASS_TURN, "아직 던질 수 있어서 턴을 넘길 수 없습니다.");
             }
+            if (turnManager.hasAnyMove(session)) {
+                throw new InvalidRequestException(CANNOT_PASS_TURN, "움직일 수 있는 말이 있어서 턴을 넘길 수 없습니다.");
+            }
             turnManager.nextTurn(session);
             broadcastTurnChanged(session);
         }
     }
 
-    // ═══════════ 4번(MoveRelayService / TurnTimerService) → 결과 통보 ═══════════
-
-    // 이동이 확정된 뒤 호출. 승리·추가 던지기·턴 넘김을 여기서 정한다
-    public void onMoveApplied(String roomCode, int team, int moveCount, int capturedCount,
-                              boolean isFinished, boolean hasRemainingAction) {
+    // MOVE  클라는 "어떤 말을, 어떤 윷 결과(칸 수)로, 어느 칸으로"만 보낸다
+    // 갈 수 있는 칸인지, 잡기·업기·완주, 턴 유지 여부는 전부 서버가 판(BoardState)으로 계산한다
+    // 흐름: 검증 → 판에 적용 → MOVE_APPLIED 방송 → 팀 완주면 게임 종료, 아니면 턴 처리
+    public void move(String roomCode, String playerId, MoveRequest request) {
         GameSession session = getSession(roomCode);
         synchronized (session) {
             requirePhase(session, GamePhase.PLAYING);
-            if (team != session.getCurrentTeam()) {
-                throw new ForbiddenException(NOT_YOUR_TURN, "현재 차례가 아닌 팀의 이동입니다: " + team);
+            int team = requireCurrentTurn(session, playerId);
+
+            // 윷·모로 남은 던지기가 있으면 먼저 다 던져야 한다 (Unity GameRules.MovePiece와 같은 규칙)
+            if (session.getRemainingThrows() > 0) {
+                throw new InvalidRequestException(THROW_REMAINING, "남은 던지기를 먼저 해야 합니다.");
             }
-            if (isFinished) {
+            // 이 게임에 있는 자기 팀 말인지
+            int pieceId = request.pieceId();
+            if (!session.getSetup().isValidPieceId(pieceId) || GameSetup.teamOf(pieceId) != team) {
+                throw new ForbiddenException(NOT_YOUR_PIECE, "자기 팀 말만 움직일 수 있습니다: " + pieceId);
+            }
+            // 던져서 저장된 결과로만 움직일 수 있다
+            boolean hasResult = session.getStoredResults().stream().anyMatch(r -> r.steps() == request.moveCount());
+            if (!hasResult) {
+                throw new InvalidRequestException(INVALID_MOVE_RESULT,
+                        "저장된 윷 결과 중 " + request.moveCount() + "칸 결과가 없습니다.");
+            }
+
+            // 판 규칙상 그 칸으로 갈 수 있을 때만 적용 (지름길·빽도·증강 보정 포함)
+            MoveResult result = session.getBoardState()
+                    .tryMove(pieceId, request.moveCount(), request.destinationNodeId())
+                    .orElseThrow(() -> new InvalidRequestException(INVALID_MOVE,
+                            "갈 수 없는 칸입니다: 말 " + pieceId + ", " + request.moveCount() + "칸 → " + request.destinationNodeId()));
+
+            // 재접속 시 놓친 이동을 다시 보낼 수 있게 seq와 함께 기록 (재접속 담당 CommandLog)
+            MoveAppliedMessage applied = MoveAppliedMessage.of(team, result, request.stateHash());
+            long seq = broadcaster.broadcast(session.getRoomCode(), MessageType.MOVE_APPLIED, applied);
+            commandLog.append(session.getRoomCode(), seq, MessageType.MOVE_APPLIED, team, applied);
+
+            // 팀 말이 전부 들어왔으면 승리 (MVP: 먼저 다 들어온 팀이 이김. 순위 보상은 이후 작업)
+            if (session.getBoardState().teamFinished(team)) {
                 finishGame(session, team, GameEndReason.FINISHED);
                 return;
             }
-            boolean turnChanged = turnManager.afterMove(session, moveCount, capturedCount, hasRemainingAction);
-            if (turnChanged) {
+
+            // 쓴 윷 결과 제거, 잡으면 한 번 더, 남은 행동 없으면 다음 팀
+            if (turnManager.afterMove(session, result)) {
                 broadcastTurnChanged(session);
             }
         }

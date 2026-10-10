@@ -1,6 +1,7 @@
 package com.teamyutnori.yutnori.game.service;
 
 import com.teamyutnori.yutnori.common.InvalidRequestException;
+import com.teamyutnori.yutnori.game.board.MoveResult;
 import com.teamyutnori.yutnori.game.exception.GameErrorCode;
 import com.teamyutnori.yutnori.game.model.GameSession;
 import com.teamyutnori.yutnori.game.yut.YutResult;
@@ -42,10 +43,39 @@ public class TurnManager {
     }
 
     // 이동 확정 후 (Unity MovePiece 뒷부분 + TryEndTurnIfNoAction)
-    // moveCount: 이동에 쓴 윷 결과의 칸 수 (MoveCommand.MoveCount, 증강 보정 전 값)
+    // result: 서버가 BoardState.tryMove로 직접 계산한 이동 결과 (클라 보고값을 쓰지 않음)
     // 턴이 바뀌었으면 true
-    public boolean afterMove(GameSession s, int moveCount, int capturedCount, boolean hasRemainingAction) {
+    public boolean afterMove(GameSession s, MoveResult result) {
+        removeUsedResult(s, result.moveCount());
+        boolean hasRemainingAction = hasAnyMove(s);   // 남은 윷 결과로 움직일 말이 있는지 (판으로 계산)
+        return finishMove(s, result.capturedCount(), hasRemainingAction);
+    }
+
+    // 판 없이 턴 규칙만 확인하는 테스트용 (같은 패키지에서만 호출 가능)
+    // 실제 게임에서는 위 afterMove(GameSession, MoveResult)만 쓴다 → 클라가 보낸 값이 들어갈 길을 막는다
+    boolean afterMove(GameSession s, int moveCount, int capturedCount, boolean hasRemainingAction) {
         removeUsedResult(s, moveCount);
+        return finishMove(s, capturedCount, hasRemainingAction);
+    }
+
+    // 던지기 직후 (Unity ThrowYut 끝의 TryEndTurnIfNoAction)
+    // 더 던질 것도 없고, 저장된 결과로 움직일 말도 없으면 턴을 넘긴다 (예: 판에 말이 없는데 빽도)
+    // 턴이 바뀌었으면 true
+    public boolean endTurnIfNoAction(GameSession s) {
+        if (s.getRemainingThrows() == 0 && !hasAnyMove(s)) {
+            nextTurn(s);
+            return true;
+        }
+        return false;
+    }
+
+    // 현재 팀이 저장된 윷 결과 중 하나로 움직일 수 있는 말이 있는지 (Unity HasAnyStoredMove)
+    public boolean hasAnyMove(GameSession s) {
+        List<Integer> steps = s.getStoredResults().stream().map(YutResult::steps).toList();
+        return s.getBoardState().hasAnyMove(s.getCurrentTeam(), steps);
+    }
+
+    private boolean finishMove(GameSession s, int capturedCount, boolean hasRemainingAction) {
         s.setMovedThisTurn(true);
 
         if (capturedCount > 0) {
