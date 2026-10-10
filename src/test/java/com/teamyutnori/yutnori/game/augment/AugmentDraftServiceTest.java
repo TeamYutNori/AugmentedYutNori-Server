@@ -26,7 +26,7 @@ class AugmentDraftServiceTest {
     @Test
     @DisplayName("augments.json을 읽어 5종을 json 순서대로 가진다")
     void catalogLoadsJson() {
-        assertEquals(List.of("BackDoSwitch", "QuickStart", "Rethrow", "SturdyCarry", "WeakBoost"),
+        assertEquals(List.of("Contrarian", "Sprinter", "Rethrow", "FriendShield", "Monk"),
                 catalog.allIds());
     }
 
@@ -45,12 +45,12 @@ class AugmentDraftServiceTest {
     @DisplayName("이미 가진 증강은 후보에서 빠진다")
     void excludesOwned() {
         GameSession session = newSession();
-        session.addAugment(0, "QuickStart");
+        session.addAugment(0, "Sprinter");
         session.addAugment(0, "Rethrow");
         AugmentDraftService draft = new AugmentDraftService(catalog, new SequenceRandomProvider(0.0));
         List<String> picked = draft.draft(session, 0, 5);
         assertEquals(3, picked.size());
-        assertFalse(picked.contains("QuickStart"));
+        assertFalse(picked.contains("Sprinter"));
         assertFalse(picked.contains("Rethrow"));
     }
 
