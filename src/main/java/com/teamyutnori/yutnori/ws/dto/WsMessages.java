@@ -4,6 +4,9 @@ import com.teamyutnori.yutnori.game.model.GameEndReason;
 import com.teamyutnori.yutnori.game.model.GamePhase;
 import com.teamyutnori.yutnori.game.yut.YutResult;
 import com.teamyutnori.yutnori.reconnect.TimerType;
+import com.teamyutnori.yutnori.room.model.Room;
+import com.teamyutnori.yutnori.room.model.RoomMember;
+import com.teamyutnori.yutnori.room.model.RoomStatus;
 
 import java.util.List;
 import java.util.Map;
@@ -48,4 +51,38 @@ public final class WsMessages {
             int timerRemainingSec
     ) {}
 
+    // ROOM_STATE 메시지 안에서 사용하는 참가자 한 명의 정보
+    // 클라이언트가 방에 누가 들어와 있는지, 어떤 팀인지, 준비 상태가 어떤지를 화면에 표시할 때 사용
+    public record RoomMemberMessage(String playerId, String nickname, int team, boolean ready) {
+
+        // Room 도메인 객체의 참가자 정보를
+        // 클라이언트에게 전달할 WebSocket 응답 형태로 변환
+        public static RoomMemberMessage from(RoomMember member) {
+            return new RoomMemberMessage(
+                    member.getPlayerId(),
+                    member.getNickname(),
+                    member.getTeam(),
+                    member.isReady()
+            );
+        }
+    }
+
+    // 서버가 현재 방 전체 상태를 클라이언트들에게 전달할 때 사용하는 메시지
+    // JOIN_ROOM, READY, LEAVE_ROOM 등으로 방 상태가 바뀔 때 최신 상태를 모든 참가자에게 ROOM_STATE로 방송하기 위해 사용
+    public record RoomStateMessage(String roomCode, RoomStatus status,
+                                   int currentPlayers, int maxPlayers, List<RoomMemberMessage> members) {
+
+        // 현재 Room 객체의 상태를 기준으로
+        // 클라이언트에게 보낼 ROOM_STATE 메시지 데이터를 생성
+        public static RoomStateMessage from(Room room) {
+            List<RoomMemberMessage> members = room.getMembers().stream().map(RoomMemberMessage::from).toList();
+            return new RoomStateMessage(
+                    room.getCode(),
+                    room.getStatus(),
+                    room.getCurrentPlayers(),
+                    room.getMaxPlayers(),
+                    members
+            );
+        }
+    }
 }
