@@ -14,7 +14,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-// 실제 src/main/resources/augments.json(5종)을 읽어서 후보 뽑기를 확인한다
+// 실제 src/main/resources/augments.json(11종)을 읽어서 후보 뽑기를 확인한다
 class AugmentDraftServiceTest {
 
     private final AugmentCatalog catalog = new AugmentCatalog(JsonMapper.builder().build());
@@ -24,9 +24,10 @@ class AugmentDraftServiceTest {
     }
 
     @Test
-    @DisplayName("augments.json을 읽어 5종을 json 순서대로 가진다")
+    @DisplayName("augments.json을 읽어 11종을 json 순서대로 가진다")
     void catalogLoadsJson() {
-        assertEquals(List.of("Contrarian", "Sprinter", "Rethrow", "FriendShield", "Monk"),
+        assertEquals(List.of("Contrarian", "Sprinter", "Rethrow", "FriendShield", "Monk",
+                        "Pacifist", "Marathoner", "Assassin", "Loner", "Hunter", "Gambler"),
                 catalog.allIds());
     }
 
@@ -48,8 +49,8 @@ class AugmentDraftServiceTest {
         session.addAugment(0, "Sprinter");
         session.addAugment(0, "Rethrow");
         AugmentDraftService draft = new AugmentDraftService(catalog, new SequenceRandomProvider(0.0));
-        List<String> picked = draft.draft(session, 0, 5);
-        assertEquals(3, picked.size());
+        List<String> picked = draft.draft(session, 0, 11);
+        assertEquals(9, picked.size());
         assertFalse(picked.contains("Sprinter"));
         assertFalse(picked.contains("Rethrow"));
     }
