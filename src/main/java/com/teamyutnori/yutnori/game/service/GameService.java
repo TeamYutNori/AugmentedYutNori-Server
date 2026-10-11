@@ -6,6 +6,7 @@ import com.teamyutnori.yutnori.common.InvalidRequestException;
 import com.teamyutnori.yutnori.common.NotFoundException;
 import com.teamyutnori.yutnori.config.GameProperties;
 import com.teamyutnori.yutnori.game.augment.AugmentDraftService;
+import com.teamyutnori.yutnori.game.augment.AugmentEffects;
 import com.teamyutnori.yutnori.game.augment.RethrowValidator;
 import com.teamyutnori.yutnori.game.board.BoardGraph;
 import com.teamyutnori.yutnori.game.board.BoardLayoutRepository;
@@ -63,6 +64,7 @@ public class GameService implements GameEndPort {
     private final TurnTimerService turnTimerService;
     private final BoardLayoutRepository boardLayouts;
     private final CommandLog commandLog;
+    private final AugmentEffects augmentEffects;
 
     // ═══════════ 2번(RoomService) → 게임 시작 ═══════════
 
@@ -338,6 +340,8 @@ public class GameService implements GameEndPort {
 
     private void confirmAugment(GameSession session, int team, String augmentId, boolean autoSelected) {
         session.addAugment(team, augmentId);
+        // 이동 규칙 증강이면 판에도 등록해 이동 계산에 반영 (야바위꾼·사냥꾼·도박사는 보유 목록만 사용)
+        augmentEffects.create(augmentId, team).ifPresent(session.getBoardState()::addAugment);
         session.clearOffered(team);
         broadcaster.broadcast(session.getRoomCode(), MessageType.AUGMENT_SELECTED,
                 new AugmentSelectedMessage(team, augmentId, autoSelected));
