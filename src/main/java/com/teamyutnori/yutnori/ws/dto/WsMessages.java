@@ -16,7 +16,22 @@ public final class WsMessages {
     public record ErrorMessage(String code, String message) {}
     public record PlayerDisconnectedMessage(String playerId, int graceSec) {}
     public record PlayerReconnectedMessage(String playerId) {}
-    public record GameEndedMessage(int winnerTeam, GameEndReason reason){}
+
+    // 게임 결과 한 줄 (플레이어 = 팀). rank는 이번 판 등수(1부터, 같은 등수 다음은 건너뜀)
+    // 기권·끊김으로 나간 플레이어는 꼴찌 등수 + rewardGold 0
+    public record RankingEntry(String playerId, int team, int rank, int rewardGold) {}
+
+    // rankings: 이번 판 등수 목록. 순위 계산·끊김 처리가 채운다
+    public record GameEndedMessage(int winnerTeam, GameEndReason reason, List<RankingEntry> rankings) {
+        public GameEndedMessage {
+            rankings = rankings == null ? List.of() : List.copyOf(rankings);
+        }
+
+        // 순위를 아직 채우지 않는 곳용 (rankings = 빈 목록)
+        public GameEndedMessage(int winnerTeam, GameEndReason reason) {
+            this(winnerTeam, reason, List.of());
+        }
+    }
 
     public record GameSnapshotMessage(
             long lastSeq,

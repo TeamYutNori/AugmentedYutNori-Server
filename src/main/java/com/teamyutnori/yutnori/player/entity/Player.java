@@ -1,9 +1,12 @@
 package com.teamyutnori.yutnori.player.entity;
 
+import com.teamyutnori.yutnori.common.ConflictException;
+import com.teamyutnori.yutnori.common.InvalidRequestException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Getter
@@ -39,6 +42,12 @@ public class Player {
     @Column(unique = true, length = 36)
     private String guestToken;
 
+    // 보유 골드. 게임 순위 보상으로 받고 뽑기 등에 쓴다. 0 미만이 될 수 없음
+    // 기존 플레이어는 컬럼이 추가될 때 0으로 채워진다
+    @Column(nullable = false)
+    @ColumnDefault("0")
+    private int gold;
+
     // 게스트 플레이어 생성
     public static Player createGuest(
             String playerId,
@@ -72,5 +81,32 @@ public class Player {
     // 닉네임 설정 또는 변경
     public void changeNickname(String nickname) {
         this.nickname = nickname;
+    }
+
+    // 골드 지급 (게임 보상 등)
+    public void addGold(int amount) {
+        validateGoldAmount(amount);
+        this.gold = Math.addExact(this.gold, amount);
+    }
+
+    // 골드 차감 (뽑기 등). 부족하면 차감하지 않고 409로 알린다
+    public void spendGold(int amount) {
+        validateGoldAmount(amount);
+        if (gold < amount) {
+            throw new ConflictException(
+                    "NOT_ENOUGH_GOLD",
+                    "골드가 부족합니다. (보유 " + gold + ", 필요 " + amount + ")"
+            );
+        }
+        this.gold -= amount;
+    }
+
+    private static void validateGoldAmount(int amount) {
+        if (amount < 0) {
+            throw new InvalidRequestException(
+                    "INVALID_GOLD_AMOUNT",
+                    "골드 수량은 0 이상이어야 합니다: " + amount
+            );
+        }
     }
 }
