@@ -10,10 +10,11 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 /*
-    방별로 서버가 확정한 명령을 순서대로 쌓는 로그
-    seq는 1부터. 재접속 복원(readAfter)과 디버깅에 사용
-    지금은 메모리 저장. (추후 Redis)
- */
+     방별 확정 명령 기록 (seq 순서)
+     - 지금은 GameService가 MOVE_APPLIED를 기록한다
+     - 재접속 복원은 ReconnectService의 GAME_SNAPSHOT으로 하므로 readAfter로 다시 보내는 데는 쓰지 않는다
+     - 디버깅·리플레이·결과 화면 수순 표시용. 방이 없어질 때 GameService.removeGame에서 clear
+*/
 @Component
 public class CommandLog {
 
