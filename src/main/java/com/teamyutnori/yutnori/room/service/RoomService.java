@@ -11,146 +11,137 @@ import com.teamyutnori.yutnori.room.repository.RoomRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class RoomService {
-
     private final RoomRepository roomRepository;
-
-    // 방 생성
+    // 새로운 방을 생성하고 메모리 저장소에 등록
     public RoomSummaryResponse createRoom(CreateRoomRequest request) {
-        String roomCode = generateRoomCode();
-
-        Room room = new Room(
-                roomCode,
-                request.roomName(),
-                request.maxPlayers()
-        );
-
-        roomRepository.save(room);
-
-        return toSummary(room);
+        Room room;
+        // 혹시 같은 방 코드가 생성되면 충돌하지 않도록 다시 생성
+        do {
+            String roomCode = createRoomCode();
+            room = new Room(
+                    roomCode,
+                    request.isPublic(),
+                    request.maxPlayers(),
+                    request.timeLimit()
+            );
+        } while (!roomRepository.saveIfAbsent(room));
+        // 외부 응답용 DTO로 변환해서 반환
+        return RoomSummaryResponse.from(room);
     }
 
-    // 전체 방 목록 조회
-    public List<RoomSummaryResponse> getRooms() {
-        return roomRepository.findAll().stream()
-                .map(this::toSummary)
-                .toList();
+    // 방 코드로 현재 방 정보를 조회
+    public RoomSummaryResponse getRoom(String roomCode) {
+        Room room = getRoomOrThrow(roomCode);
+        return RoomSummaryResponse.from(room);
     }
 
-    // 방 하나 조회
-    public Room getRoom(String roomCode) {
-        return roomRepository.findByRoomCode(roomCode)
-                .orElseThrow(() -> new NotFoundException(
-                        "ROOM_NOT_FOUND",
-                        "방을 찾을 수 없습니다."
-                ));
-    }
-
-    // 방 참가
-    public Room joinRoom(String roomCode, String playerId, String nickname) {
-        Room room = getRoom(roomCode);
-
+    // 플레이어를 방에 참가시킴
+    public Room joinRoom(
+            String roomCode,
+            String playerId,
+            String nickname
+    ) {
+        Room room = getRoomOrThrow(roomCode);
+        // 같은 방에 여러 요청이 동시에 들어와도 참가자 상태가 꼬이지 않도록 동기화
         synchronized (room) {
+            // 게임 시작 전인 방에만 새 플레이어가 참가 가능
             if (room.getStatus() != RoomStatus.WAITING) {
                 throw new ConflictException(
-                        "ROOM_ALREADY_STARTED",
+                        "ROOM_NOT_WAITING",
                         "이미 게임이 시작된 방입니다."
                 );
             }
 
-            if (room.findMember(playerId) != null) {
-                throw new ConflictException(
-                        "PLAYER_ALREADY_JOINED",
-                        "이미 참가한 플레이어입니다."
-                );
+            // 이미 참가한 플레이어라면 중복 추가하지 않음
+            if (room.containsMember(playerId)) {
+                return room;
             }
 
+            // 최대 인원을 넘으면 참가 거부
             if (room.isFull()) {
                 throw new ConflictException(
                         "ROOM_FULL",
-                        "방이 가득 찼습니다."
+                        "방 인원이 가득 찼습니다."
                 );
             }
 
-            // 현재 인원 순서대로 팀 번호 배정
-            int team = room.getMembers().size();
-
-            room.addMember(
-                    new RoomMember(playerId, nickname, team)
+            RoomMember member = new RoomMember(
+                    playerId,
+                    nickname
             );
 
+            // 현재는 입장 순서 기준으로 팀 번호를 임시 배정
+            member.assignTeam(room.getCurrentPlayers());
+            // 검증이 모두 끝난 뒤 실제 참가자 목록에 추가
+            room.addMember(member);
             return room;
         }
     }
 
-    // 준비 상태 변경
-    public Room setReady(String roomCode, String playerId, boolean ready) {
-        Room room = getRoom(roomCode);
-
+    // 특정 플레이어의 준비 상태를 변경
+    public Room changeReady(
+            String roomCode,
+            String playerId,
+            boolean ready
+    ) {
+        Room room = getRoomOrThrow(roomCode);
+        // 준비 상태 변경도 같은 방 요청끼리 충돌하지 않도록 동기화
         synchronized (room) {
             RoomMember member = room.findMember(playerId);
-
+            // 방에 없는 플레이어는 준비 상태를 변경할 수 없음
             if (member == null) {
                 throw new NotFoundException(
-                        "PLAYER_NOT_IN_ROOM",
+                        "ROOM_MEMBER_NOT_FOUND",
                         "방에 참가하지 않은 플레이어입니다."
                 );
             }
-
+            // 클라이언트에서 전달한 준비 상태로 변경
             member.setReady(ready);
-
             return room;
         }
     }
 
-    // 방 나가기
-    public Room leaveRoom(String roomCode, String playerId) {
-        Room room = getRoom(roomCode);
-
+    // 플레이어를 방에서 퇴장시킴
+    public Room leaveRoom(
+            String roomCode,
+            String playerId
+    ) {
+        Room room = getRoomOrThrow(roomCode);
         synchronized (room) {
-            RoomMember member = room.findMember(playerId);
-
-            if (member == null) {
+            // 실제 참가 중인 플레이어만 퇴장 가능
+            if (!room.containsMember(playerId)) {
                 throw new NotFoundException(
-                        "PLAYER_NOT_IN_ROOM",
+                        "ROOM_MEMBER_NOT_FOUND",
                         "방에 참가하지 않은 플레이어입니다."
                 );
             }
-
             room.removeMember(playerId);
-
+            // 마지막 플레이어가 나가면 빈 방은 저장소에서 제거
+            if (room.getCurrentPlayers() == 0) {
+                roomRepository.delete(roomCode);
+            }
             return room;
         }
     }
 
-    // 응답 DTO 변환
-    private RoomSummaryResponse toSummary(Room room) {
-        return new RoomSummaryResponse(
-                room.getRoomCode(),
-                room.getRoomName(),
-                room.getMembers().size(),
-                room.getMaxPlayers(),
-                room.getStatus()
-        );
+    // 방 조회 로직을 한 곳에서 처리
+    public Room getRoomOrThrow(String roomCode) {
+        return roomRepository.findByCode(roomCode)
+                .orElseThrow(() -> new NotFoundException(
+                        "ROOM_NOT_FOUND",
+                        "존재하지 않는 방입니다."
+                ));
     }
-
-    // 6자리 방 코드 생성
-    private String generateRoomCode() {
-        String roomCode;
-
-        do {
-            roomCode = UUID.randomUUID()
-                    .toString()
-                    .replace("-", "")
-                    .substring(0, 6)
-                    .toUpperCase();
-        } while (roomRepository.exists(roomCode));
-
-        return roomCode;
+    // 외부에서 사용하기 쉬운 6자리 대문자 방 코드 생성
+    private String createRoomCode() {
+        return UUID.randomUUID()
+                .toString()
+                .substring(0, 6)
+                .toUpperCase();
     }
 }
