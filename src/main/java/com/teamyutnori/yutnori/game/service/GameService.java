@@ -145,8 +145,9 @@ public class GameService implements GameEndPort {
             }
 
             YutThrowOutcome outcome = yutThrowService.throwYut();
-            turnManager.applyThrow(session, outcome.result());
+            turnManager.applyThrow(session, outcome.result());   // 도박사면 저장값만 도↔모로 바뀐다
 
+            // 원래 결과를 보낸다. 도박사 변환은 클라가 직접 한다 (Unity GameRules.ApplyThrow)
             broadcaster.broadcast(session.getRoomCode(), MessageType.THROW_RESULT,
                     new ThrowResultMessage(team, outcome.sticks(), outcome.result(), false));
 

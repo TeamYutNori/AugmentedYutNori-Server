@@ -1,6 +1,7 @@
 package com.teamyutnori.yutnori.game.service;
 
 import com.teamyutnori.yutnori.common.InvalidRequestException;
+import com.teamyutnori.yutnori.game.augment.AugmentIds;
 import com.teamyutnori.yutnori.game.board.MoveResult;
 import com.teamyutnori.yutnori.game.exception.GameErrorCode;
 import com.teamyutnori.yutnori.game.model.GameSession;
@@ -11,8 +12,16 @@ import java.util.List;
 
 // 턴 규칙 (Unity TurnManager + GameRules 턴 처리 이식)
 // GameSession 값만 바꾸고 메시지 전송은 하지 않는다
+//
+// 던지기·턴에 영향을 주는 증강도 여기서 처리한다 (Unity GameRules와 같은 규칙)
+//  - 사냥꾼(Hunter): 잡으면 2번 더 던지고, 윷·모가 나와도 한 번 더 없음
+//  - 도박사(Gambler): 도↔모가 바뀌어 저장되고, 바뀐 결과는 한 번 더 없음
+//    THROW_RESULT에는 원래 결과를 보내고 클라가 직접 바꾼다 → 서버는 저장값만 바꿔 양쪽을 맞춘다
 @Component
 public class TurnManager {
+
+    // 사냥꾼이 잡았을 때 받는 추가 던지기 수 (Unity HunterAugment.CaptureBonusThrows)
+    static final int HUNTER_CAPTURE_BONUS = 2;
 
     // 증강 선택이 끝난 뒤 첫 턴
     public void startFirstTurn(GameSession s) {
@@ -20,14 +29,18 @@ public class TurnManager {
         resetTurn(s);
     }
 
-    // 던진 결과 반영 (Unity ConsumeThrow)
-    public void applyThrow(GameSession s, YutResult result) {
+    // 던진 결과 반영 (Unity GameRules.ApplyThrow + ConsumeThrow)
+    // rolled: 윷가락으로 나온 원래 결과. 도박사면 도↔모를 바꿔 저장한다
+    public void applyThrow(GameSession s, YutResult rolled) {
+        YutResult stored = hasAugment(s, AugmentIds.GAMBLER) ? swapForGambler(rolled) : rolled;
+        boolean swapped = stored != rolled;
+
         s.setRemainingThrows(s.getRemainingThrows() - 1);
-        if (result.grantsExtraThrow()) {
-            s.setRemainingThrows(s.getRemainingThrows() + 1);   // 윷·모 = 한 번 더
+        if (!swapped && grantsExtraThrow(s, stored)) {
+            s.setRemainingThrows(s.getRemainingThrows() + 1);   // 윷·모 = 한 번 더 (사냥꾼·도박사 변환 제외)
         }
-        s.getStoredResults().add(result);
-        s.setLatestResult(result);
+        s.getStoredResults().add(stored);
+        s.setLatestResult(stored);
     }
 
     // 재던지기: 마지막 결과를 교체하고 보너스 다시 계산 (Unity ReplaceThrowResult)
@@ -39,8 +52,9 @@ public class TurnManager {
         s.setLatestResult(newResult);
         s.setRethrownThisTurn(true);   // 야바위꾼은 턴당 1번
 
-        if (oldResult.grantsExtraThrow()) s.setRemainingThrows(s.getRemainingThrows() - 1);
-        if (newResult.grantsExtraThrow()) s.setRemainingThrows(s.getRemainingThrows() + 1);
+        // 다시 던진 결과는 도박사 변환을 하지 않는다 (Unity ApplyRethrow와 동일)
+        if (grantsExtraThrow(s, oldResult)) s.setRemainingThrows(s.getRemainingThrows() - 1);
+        if (grantsExtraThrow(s, newResult)) s.setRemainingThrows(s.getRemainingThrows() + 1);
     }
 
     // 이동 확정 후 (Unity MovePiece 뒷부분 + TryEndTurnIfNoAction)
@@ -80,7 +94,8 @@ public class TurnManager {
         s.setMovedThisTurn(true);
 
         if (capturedCount > 0) {
-            s.setRemainingThrows(s.getRemainingThrows() + 1);   // 잡으면 한 번 더
+            int bonus = hasAugment(s, AugmentIds.HUNTER) ? HUNTER_CAPTURE_BONUS : 1;
+            s.setRemainingThrows(s.getRemainingThrows() + bonus);   // 잡으면 한 번 더 (사냥꾼은 2번)
         }
 
         // 던질 것도 없고, 남은 결과로 움직일 수 있는 말도 없으면 턴 종료
@@ -99,6 +114,25 @@ public class TurnManager {
     }
 
     // ── 내부 ──
+
+    // 이번 결과로 한 번 더 던지는지 (사냥꾼이면 윷·모여도 없음) (Unity GameRules.GrantsExtraThrow)
+    private boolean grantsExtraThrow(GameSession s, YutResult result) {
+        return result.grantsExtraThrow() && !hasAugment(s, AugmentIds.HUNTER);
+    }
+
+    // 현재 차례 팀이 이 증강을 가졌는지
+    private boolean hasAugment(GameSession s, String augmentId) {
+        return s.hasAugment(s.getCurrentTeam(), augmentId);
+    }
+
+    // 도박사: 도는 모로, 모는 도로. 나머지는 그대로 (Unity GamblerAugment.Swap)
+    static YutResult swapForGambler(YutResult result) {
+        return switch (result) {
+            case Do -> YutResult.Mo;
+            case Mo -> YutResult.Do;
+            default -> result;
+        };
+    }
 
     // 새 턴 초기화 (Unity StartTurn)
     private void resetTurn(GameSession s) {

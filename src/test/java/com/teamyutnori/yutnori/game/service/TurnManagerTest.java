@@ -1,6 +1,7 @@
 package com.teamyutnori.yutnori.game.service;
 
 import com.teamyutnori.yutnori.common.InvalidRequestException;
+import com.teamyutnori.yutnori.game.augment.AugmentIds;
 import com.teamyutnori.yutnori.game.board.MoveResult;
 import com.teamyutnori.yutnori.game.board.TestBoards;
 import com.teamyutnori.yutnori.game.model.GameSession;
@@ -136,6 +137,64 @@ class TurnManagerTest {
         MoveResult result = session.getBoardState().tryMove(0, 5, 5).orElseThrow();
         assertFalse(turnManager.afterMove(session, result), "5번 칸 말이 빽도로 움직일 수 있음");
         assertEquals(List.of(YutResult.BackDo), session.getStoredResults());
+    }
+
+    // ── 던지기·턴 규칙 증강 ──
+
+    @Test
+    @DisplayName("사냥꾼: 윷·모가 나와도 한 번 더 없음")
+    void hunterNoExtraOnYutMo() {
+        session.addAugment(0, AugmentIds.HUNTER);
+        turnManager.applyThrow(session, YutResult.Mo);
+        assertEquals(0, session.getRemainingThrows());
+    }
+
+    @Test
+    @DisplayName("사냥꾼: 잡으면 2번 더 던진다")
+    void hunterCaptureBonus() {
+        session.addAugment(0, AugmentIds.HUNTER);
+        turnManager.applyThrow(session, YutResult.Do);
+        assertFalse(turnManager.afterMove(session, 1, 1, false));
+        assertEquals(2, session.getRemainingThrows());
+    }
+
+    @Test
+    @DisplayName("도박사: 도는 모로 저장되지만 한 번 더는 없다")
+    void gamblerDoToMo() {
+        session.addAugment(0, AugmentIds.GAMBLER);
+        turnManager.applyThrow(session, YutResult.Do);
+        assertEquals(List.of(YutResult.Mo), session.getStoredResults());
+        assertEquals(YutResult.Mo, session.getLatestResult());
+        assertEquals(0, session.getRemainingThrows());
+    }
+
+    @Test
+    @DisplayName("도박사: 모는 도로 저장, 윷은 그대로 한 번 더")
+    void gamblerMoToDoAndYutUnchanged() {
+        session.addAugment(0, AugmentIds.GAMBLER);
+        turnManager.applyThrow(session, YutResult.Yut);
+        assertEquals(1, session.getRemainingThrows());
+        turnManager.applyThrow(session, YutResult.Mo);
+        assertEquals(List.of(YutResult.Yut, YutResult.Do), session.getStoredResults());
+        assertEquals(0, session.getRemainingThrows());
+    }
+
+    @Test
+    @DisplayName("증강은 현재 차례 팀 것만 적용")
+    void augmentOnlyForCurrentTeam() {
+        session.addAugment(1, AugmentIds.GAMBLER);
+        turnManager.applyThrow(session, YutResult.Do);
+        assertEquals(List.of(YutResult.Do), session.getStoredResults());
+    }
+
+    @Test
+    @DisplayName("다시 던지기: 턴 사용 표시, 턴이 바뀌면 초기화")
+    void rethrowFlagResetsOnNewTurn() {
+        turnManager.applyThrow(session, YutResult.Gae);
+        turnManager.applyRethrow(session, YutResult.Do);
+        assertTrue(session.isRethrownThisTurn());
+        turnManager.nextTurn(session);
+        assertFalse(session.isRethrownThisTurn());
     }
 
     @Test
