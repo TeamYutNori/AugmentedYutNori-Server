@@ -1,5 +1,6 @@
 package com.teamyutnori.yutnori.reconnect;
 
+import com.teamyutnori.yutnori.game.board.PieceState;
 import com.teamyutnori.yutnori.game.model.GamePhase;
 import com.teamyutnori.yutnori.game.board.TestBoards;
 import com.teamyutnori.yutnori.game.model.GameSession;
@@ -10,6 +11,7 @@ import com.teamyutnori.yutnori.game.yut.YutResult;
 import com.teamyutnori.yutnori.ws.RoomBroadcaster;
 import com.teamyutnori.yutnori.ws.SequenceTracker;
 import com.teamyutnori.yutnori.ws.dto.MessageType;
+import com.teamyutnori.yutnori.ws.dto.WsMessages.PieceSnapshot;
 import com.teamyutnori.yutnori.ws.dto.WsMessages.GameSnapshotMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -142,5 +144,28 @@ class ReconnectServiceTest {
     void notInGame() {
         assertThat(service.sendSnapshot(ROOM, "ghost")).isFalse();
         verifyNoInteractions(broadcaster);
+    }
+    // 이동 전: 모든 말이 대기석, id 순서로 담긴다
+    @Test
+    void piecesWaiting() {
+        service.sendSnapshot(ROOM, "p0");
+
+        GameSnapshotMessage snapshot = captureSentTo("p0");
+        assertThat(snapshot.pieces()).extracting(PieceSnapshot::pieceId).containsExactly(0, 1, 100, 101);
+        assertThat(snapshot.pieces()).allMatch(p -> p.state() == PieceState.WAITING && p.cameFromNodeId() == null);
+    }
+
+    // 이동 후: 움직인 말의 칸·직전 칸·상태가 담긴다
+    @Test
+    void piecesMoved() {
+        session.getBoardState().tryMove(0, 2, 2);   // 팀 0의 0번 말을 2칸 → 2번 칸
+
+        service.sendSnapshot(ROOM, "p0");
+
+        PieceSnapshot moved = captureSentTo("p0").pieces().get(0);
+        assertThat(moved.pieceId()).isZero();
+        assertThat(moved.state()).isEqualTo(PieceState.ON_BOARD);
+        assertThat(moved.nodeId()).isEqualTo(2);
+        assertThat(moved.cameFromNodeId()).isEqualTo(1);
     }
 }

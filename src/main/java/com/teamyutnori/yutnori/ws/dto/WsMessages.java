@@ -1,5 +1,6 @@
 package com.teamyutnori.yutnori.ws.dto;
 
+import com.teamyutnori.yutnori.game.board.PieceState;
 import com.teamyutnori.yutnori.game.model.GameEndReason;
 import com.teamyutnori.yutnori.game.model.GamePhase;
 import com.teamyutnori.yutnori.game.yut.YutResult;
@@ -17,6 +18,7 @@ public final class WsMessages {
     public record PlayerDisconnectedMessage(String playerId, int graceSec) {}
     public record PlayerReconnectedMessage(String playerId) {}
     public record GameEndedMessage(int winnerTeam, GameEndReason reason){}
+    public record PieceSnapshot(int pieceId, int team, PieceState state, int nodeId, Integer cameFromNodeId) {}
 
     public record GameSnapshotMessage(
             long lastSeq,
@@ -26,11 +28,11 @@ public final class WsMessages {
             int remainingThrows,
             int turnNumber,
             List<YutResult> storedResults,
+            List<PieceSnapshot> pieces,              // 추가
             Map<Integer, List<String>> ownedAugments,
             List<String> offeredAugments,
             Integer winnerTeam,
             TimerType timerType,
             int timerRemainingSec
     ) {}
-
 }

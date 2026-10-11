@@ -1,8 +1,9 @@
 package com.teamyutnori.yutnori.reconnect;
 
+import com.teamyutnori.yutnori.game.board.BoardState;
+import com.teamyutnori.yutnori.game.board.Piece;
 import com.teamyutnori.yutnori.game.model.GameSession;
 import com.teamyutnori.yutnori.game.repository.GameSessionRepository;
-import com.teamyutnori.yutnori.game.service.GameService;
 import com.teamyutnori.yutnori.game.service.StateDesyncEvent;
 import com.teamyutnori.yutnori.ws.RoomBroadcaster;
 import com.teamyutnori.yutnori.ws.SequenceTracker;
@@ -12,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+import com.teamyutnori.yutnori.ws.dto.WsMessages.PieceSnapshot;
+import java.util.Comparator;
 
 import java.time.Duration;
 import java.util.List;
@@ -77,12 +80,27 @@ public class ReconnectService {
                 session.getRemainingThrows(),
                 session.getTurnNumber(),
                 List.copyOf(session.getStoredResults()),
+                piecesOf(session.getBoardState()),
                 owned,
                 List.copyOf(offered),
                 session.getWinnerTeam(),
                 timerType,
                 remainingSec
         );
+    }
+
+    // 판 위 모든 말의 상태 (말 id 순). 판이 아직 없으면 빈 목록
+    private static List<PieceSnapshot> piecesOf(BoardState board) {
+        if (board == null) return List.of();
+        return board.getPieces().stream()
+                .sorted(Comparator.comparingInt(Piece::getId))
+                .map(p -> new PieceSnapshot(
+                        p.getId(),
+                        p.getTeam(),
+                        p.getState(),
+                        p.getNode().getId(),
+                        p.getCameFrom() == null ? null : p.getCameFrom().getId()))
+                .toList();
     }
 
     private static int ceilSeconds(Duration duration) {
