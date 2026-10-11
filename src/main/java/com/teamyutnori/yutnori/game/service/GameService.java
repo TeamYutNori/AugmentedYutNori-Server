@@ -6,6 +6,7 @@ import com.teamyutnori.yutnori.common.InvalidRequestException;
 import com.teamyutnori.yutnori.common.NotFoundException;
 import com.teamyutnori.yutnori.config.GameProperties;
 import com.teamyutnori.yutnori.game.augment.AugmentDraftService;
+import com.teamyutnori.yutnori.game.augment.AugmentEffects;
 import com.teamyutnori.yutnori.game.augment.RethrowValidator;
 import com.teamyutnori.yutnori.game.board.BoardGraph;
 import com.teamyutnori.yutnori.game.board.BoardLayoutRepository;
@@ -63,6 +64,7 @@ public class GameService implements GameEndPort {
     private final TurnTimerService turnTimerService;
     private final BoardLayoutRepository boardLayouts;
     private final CommandLog commandLog;
+    private final AugmentEffects augmentEffects;
 
     // ═══════════ 2번(RoomService) → 게임 시작 ═══════════
 
@@ -143,8 +145,9 @@ public class GameService implements GameEndPort {
             }
 
             YutThrowOutcome outcome = yutThrowService.throwYut();
-            turnManager.applyThrow(session, outcome.result());
+            turnManager.applyThrow(session, outcome.result());   // 도박사면 저장값만 도↔모로 바뀐다
 
+            // 원래 결과를 보낸다. 도박사 변환은 클라가 직접 한다 (Unity GameRules.ApplyThrow)
             broadcaster.broadcast(session.getRoomCode(), MessageType.THROW_RESULT,
                     new ThrowResultMessage(team, outcome.sticks(), outcome.result(), false));
 
@@ -167,8 +170,7 @@ public class GameService implements GameEndPort {
             }
 
             YutThrowOutcome outcome = yutThrowService.throwYut();
-            session.removeAugment(team, RethrowValidator.RETHROW_AUGMENT_ID);   // 1회용 증강 소모
-            turnManager.applyRethrow(session, outcome.result());
+            turnManager.applyRethrow(session, outcome.result());   // 결과 교체 + 이번 턴 사용 표시 (증강은 계속 보유)
 
             broadcaster.broadcast(session.getRoomCode(), MessageType.THROW_RESULT,
                     new ThrowResultMessage(team, outcome.sticks(), outcome.result(), true));
@@ -339,6 +341,8 @@ public class GameService implements GameEndPort {
 
     private void confirmAugment(GameSession session, int team, String augmentId, boolean autoSelected) {
         session.addAugment(team, augmentId);
+        // 이동 규칙 증강이면 판에도 등록해 이동 계산에 반영 (야바위꾼·사냥꾼·도박사는 보유 목록만 사용)
+        augmentEffects.create(augmentId, team).ifPresent(session.getBoardState()::addAugment);
         session.clearOffered(team);
         broadcaster.broadcast(session.getRoomCode(), MessageType.AUGMENT_SELECTED,
                 new AugmentSelectedMessage(team, augmentId, autoSelected));

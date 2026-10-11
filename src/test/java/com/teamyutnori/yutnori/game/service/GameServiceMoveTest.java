@@ -5,6 +5,7 @@ import com.teamyutnori.yutnori.common.ForbiddenException;
 import com.teamyutnori.yutnori.common.InvalidRequestException;
 import com.teamyutnori.yutnori.config.GameProperties;
 import com.teamyutnori.yutnori.game.augment.AugmentDraftService;
+import com.teamyutnori.yutnori.game.augment.AugmentEffects;
 import com.teamyutnori.yutnori.game.augment.RethrowValidator;
 import com.teamyutnori.yutnori.game.board.TestBoards;
 import com.teamyutnori.yutnori.game.dto.GameMessages.MoveAppliedMessage;
@@ -62,7 +63,8 @@ class GameServiceMoveTest {
 
         service = new GameService(repository, new TurnManager(), mock(YutThrowService.class),
                 mock(AugmentDraftService.class), mock(RethrowValidator.class), broadcaster,
-                mock(GameProperties.class), mock(TurnTimerService.class), TestBoards.repository(), commandLog);
+                mock(GameProperties.class), mock(TurnTimerService.class), TestBoards.repository(), commandLog,
+                mock(AugmentEffects.class));
     }
 
     // 개(2칸)로 내 말(0번)을 2번 칸으로

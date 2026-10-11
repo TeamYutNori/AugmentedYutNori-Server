@@ -10,10 +10,11 @@ import java.util.List;
 //   4. onMoved         : 이동이 끝난 뒤 효과    (예: 1회용 증강 소모)
 // 증강은 모든 팀의 이동에 호출된다. 내 말에만 적용하려면 context.isMine(this)로 확인할 것
 // 서버와 클라 결과가 같아야 하므로 랜덤·시간을 쓰지 않는다
-// TODO: Unity Core/Augment/Augments의 증강 5개(WeakBoost, QuickStart, BackDoSwitch, Shield, SturdyCarry)를 이 인터페이스로 옮기기
+// 구현체: game/augment/effect (청개구리·스프린터·수행자·마라토너·외톨이·평화주의자·암살자·프렌드쉴드)
+// id → 객체 생성은 game/augment/AugmentEffects
 public interface BoardAugment {
 
-    String id();         // augments.json의 id와 같음 (예: "Shield")
+    String id();         // augments.json의 id와 같음 (예: "Monk")
     int ownerTeam();     // 이 증강을 가진 팀
     default int priority() { return 0; }   // 낮을수록 먼저, 같으면 등록 순서
 

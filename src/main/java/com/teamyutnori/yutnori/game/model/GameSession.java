@@ -25,6 +25,7 @@ public class GameSession {
     @Setter private int currentTeam = 0;
     @Setter private int remainingThrows = 0;    // 이번 턴에 더 던질 수 있는 횟수
     @Setter private boolean movedThisTurn = false; // 이번 턴에 말을 움직인 적이 있는지 체크
+    @Setter private boolean rethrownThisTurn = false; // 이번 턴에 야바위꾼(다시 던지기)을 썼는지 (턴당 1번)
     // 턴 번호. 새 턴이 시작될 때마다 1씩 증가 (TurnManager가 관리, 첫 턴 = 1)
     // 턴 타이머가 "자기가 시작된 턴"에만 동작하게 하는 표식으로 쓴다
     @Setter private int turnNumber = 0;

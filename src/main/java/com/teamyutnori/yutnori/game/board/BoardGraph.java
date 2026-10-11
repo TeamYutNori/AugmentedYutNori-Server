@@ -71,6 +71,13 @@ public class BoardGraph {
         return result;
     }
 
+    // 지름길을 쓰지 않고 원래 길로만 가는 경로 (Unity GetNormalPath, 마라토너가 사용). 갈 수 없으면 null
+    public BoardPath getNormalPath(BoardNode start, BoardNode cameFrom, int moveCount) {
+        if (start == null || moveCount <= 0) return null;
+        BoardNode normal = start.getNext(cameFrom);
+        return normal == null ? null : moveForward(start, cameFrom, normal, moveCount);
+    }
+
     private BoardPath moveForward(BoardNode start, BoardNode cameFrom, BoardNode first, int moveCount) {
         List<BoardNode> path = new ArrayList<>();
         BoardNode prev = cameFrom;
