@@ -59,6 +59,27 @@ class RethrowValidatorTest {
     }
 
     @Test
+    @DisplayName("턴당 1번: 이번 턴에 이미 썼으면 불가, 다음 턴엔 다시 가능")
+    void oncePerTurn() {
+        turnManager.applyThrow(session, YutResult.Gae);
+        turnManager.applyRethrow(session, YutResult.Geol);
+        assertFalse(validator.canRethrow(session, 0));
+
+        turnManager.nextTurn(session);   // 팀 1
+        turnManager.nextTurn(session);   // 다시 팀 0
+        turnManager.applyThrow(session, YutResult.Gae);
+        assertTrue(validator.canRethrow(session, 0), "증강은 1회용이 아니라 다음 턴에 또 쓸 수 있음");
+    }
+
+    @Test
+    @DisplayName("턴의 첫 굴리기에서만: 윷 다음에 던진 개는 다시 던질 수 없다")
+    void onlyFirstRollOfTurn() {
+        turnManager.applyThrow(session, YutResult.Yut);   // 한 번 더
+        turnManager.applyThrow(session, YutResult.Gae);   // 두 번째 굴리기
+        assertFalse(validator.canRethrow(session, 0));
+    }
+
+    @Test
     @DisplayName("이번 턴에 말을 움직였으면 불가")
     void notAfterMove() {
         turnManager.applyThrow(session, YutResult.Gae);

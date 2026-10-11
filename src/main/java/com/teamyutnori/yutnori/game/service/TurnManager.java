@@ -37,6 +37,7 @@ public class TurnManager {
         YutResult oldResult = stored.get(last);
         stored.set(last, newResult);
         s.setLatestResult(newResult);
+        s.setRethrownThisTurn(true);   // 야바위꾼은 턴당 1번
 
         if (oldResult.grantsExtraThrow()) s.setRemainingThrows(s.getRemainingThrows() - 1);
         if (newResult.grantsExtraThrow()) s.setRemainingThrows(s.getRemainingThrows() + 1);
@@ -105,6 +106,7 @@ public class TurnManager {
         s.setRemainingThrows(1);
         s.getStoredResults().clear();
         s.setMovedThisTurn(false);
+        s.setRethrownThisTurn(false);
         s.setLatestResult(null);
     }
 

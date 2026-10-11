@@ -167,8 +167,7 @@ public class GameService implements GameEndPort {
             }
 
             YutThrowOutcome outcome = yutThrowService.throwYut();
-            session.removeAugment(team, RethrowValidator.RETHROW_AUGMENT_ID);   // 1회용 증강 소모
-            turnManager.applyRethrow(session, outcome.result());
+            turnManager.applyRethrow(session, outcome.result());   // 결과 교체 + 이번 턴 사용 표시 (증강은 계속 보유)
 
             broadcaster.broadcast(session.getRoomCode(), MessageType.THROW_RESULT,
                     new ThrowResultMessage(team, outcome.sticks(), outcome.result(), true));
