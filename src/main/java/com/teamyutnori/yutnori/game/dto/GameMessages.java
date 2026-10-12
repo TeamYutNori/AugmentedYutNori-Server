@@ -20,11 +20,17 @@ public final class GameMessages {
     //  - movedPieceIds: 같이 움직인 말 (업힌 말 포함), capturedPieceIds: 잡혀서 대기석으로 간 말 → 클라 연출용
     //  - isFinished: 움직인 말이 완주했는지
     //  - stateHash: 이동한 쪽이 보낸 해시 (다른 기기는 재계산 후 비교해서 desync 확인)
+    //  - auto: 끊긴 플레이어 자동 진행(AutoPlayService)으로 서버가 대신 둔 이동이면 true. 직접 둔 이동은 of(team, result, stateHash) → false
     public record MoveAppliedMessage(int team, int pieceId, int moveCount, int destinationNodeId,
                                      List<Integer> movedPieceIds, List<Integer> capturedPieceIds,
-                                     @JsonProperty("isFinished") boolean isFinished, String stateHash) {
+                                     @JsonProperty("isFinished") boolean isFinished, String stateHash,
+                                     boolean auto) {
 
         public static MoveAppliedMessage of(int team, MoveResult result, String stateHash) {
+            return of(team, result, stateHash, false);
+        }
+
+        public static MoveAppliedMessage of(int team, MoveResult result, String stateHash, boolean auto) {
             return new MoveAppliedMessage(
                     team,
                     result.piece().getId(),
@@ -33,7 +39,8 @@ public final class GameMessages {
                     result.movedPieces().stream().map(Piece::getId).toList(),
                     result.capturedPieces().stream().map(Piece::getId).toList(),
                     result.finished(),
-                    stateHash);
+                    stateHash,
+                    auto);
         }
     }
 
