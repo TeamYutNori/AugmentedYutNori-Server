@@ -198,6 +198,29 @@ class TurnManagerTest {
     }
 
     @Test
+    @DisplayName("나간 팀은 차례를 건너뛴다")
+    void skipsRemovedTeam() {
+        GameSession three = new GameSession("ROOM3", new GameSetup(3, 2, "default", false),
+                Map.of("p0", 0, "p1", 1, "p2", 2), TestBoards.defaultBoard());
+        turnManager.startFirstTurn(three);
+        three.markRemoved(1);
+        turnManager.nextTurn(three);
+        assertEquals(2, three.getCurrentTeam());
+        turnManager.nextTurn(three);
+        assertEquals(0, three.getCurrentTeam());
+    }
+
+    @Test
+    @DisplayName("팀 0이 증강 선택 중에 나가면 첫 턴은 팀 1")
+    void firstTurnSkipsRemovedTeam() {
+        GameSession fresh = new GameSession("ROOM2", new GameSetup(2, 2, "default", false),
+                Map.of("p0", 0, "p1", 1), TestBoards.defaultBoard());
+        fresh.markRemoved(0);
+        turnManager.startFirstTurn(fresh);
+        assertEquals(1, fresh.getCurrentTeam());
+    }
+
+    @Test
     @DisplayName("마지막 팀 다음은 팀 0")
     void wrapsAroundTeams() {
         turnManager.nextTurn(session);

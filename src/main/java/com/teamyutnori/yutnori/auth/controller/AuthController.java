@@ -43,7 +43,8 @@ public class AuthController {
         return new LoginResponse(
                 player.getPlayerId(),
                 player.getNickname(),
-                token
+                token,
+                player.getGold()
         );
     }
 }

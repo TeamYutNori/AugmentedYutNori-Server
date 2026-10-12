@@ -127,6 +127,27 @@ class BoardStateTest {
     }
 
     @Test
+    @DisplayName("finishedCount: 팀별 들어온 말 수")
+    void finishedCount() {
+        move(0, 4, 4);
+        move(0, 5, 9);
+        move(0, 5, 14);
+        move(0, 5, 19);
+        move(0, 2, 0);   // 완주
+        assertEquals(1, state.finishedCount(0));
+        assertEquals(0, state.finishedCount(1));
+    }
+
+    @Test
+    @DisplayName("removeTeam: 나간 팀의 말은 판에서 사라져 잡히지 않는다")
+    void removeTeam() {
+        move(100, 3, 3);
+        state.removeTeam(1);
+        assertNull(state.getPiece(100));
+        assertEquals(0, move(0, 3, 3).capturedCount());
+    }
+
+    @Test
     @DisplayName("hasAnyMove: 대기 말만 있을 때 빽도만 남으면 움직일 수 없다")
     void hasAnyMove() {
         assertFalse(state.hasAnyMove(0, List.of(-1)));

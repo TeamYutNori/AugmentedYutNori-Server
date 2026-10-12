@@ -3,40 +3,38 @@ package com.teamyutnori.yutnori.room.repository;
 import com.teamyutnori.yutnori.room.model.Room;
 import org.springframework.stereotype.Repository;
 
-import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Repository
 public class RoomRepository {
-
-    // roomCode를 key로 방 정보를 메모리에 저장
+    // roomCode → Room
     private final Map<String, Room> rooms = new ConcurrentHashMap<>();
 
     // 방 저장
     public Room save(Room room) {
-        rooms.put(room.getRoomCode(), room);
+        rooms.put(room.getCode(), room);
         return room;
     }
 
-    // roomCode로 방 조회
-    public Optional<Room> findByRoomCode(String roomCode) {
-        return Optional.ofNullable(rooms.get(roomCode));
+    // 같은 코드가 없을 때만 저장
+    public boolean saveIfAbsent(Room room) {
+        return rooms.putIfAbsent(room.getCode(), room) == null;
     }
 
-    // 모든 방 조회
-    public Collection<Room> findAll() {
-        return rooms.values();
+    // 방 코드로 조회
+    public Optional<Room> findByCode(String code) {
+        return Optional.ofNullable(rooms.get(code));
     }
 
     // 방 삭제
-    public void delete(String roomCode) {
-        rooms.remove(roomCode);
+    public void delete(String code) {
+        rooms.remove(code);
     }
 
-    // 방 존재 여부 확인
-    public boolean exists(String roomCode) {
-        return rooms.containsKey(roomCode);
+    // 방 존재 여부
+    public boolean exists(String code) {
+        return rooms.containsKey(code);
     }
 }
