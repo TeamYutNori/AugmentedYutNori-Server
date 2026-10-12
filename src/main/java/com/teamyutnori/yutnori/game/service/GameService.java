@@ -29,13 +29,19 @@ import com.teamyutnori.yutnori.reconnect.GameEndPort;
 import com.teamyutnori.yutnori.reconnect.TimerType;
 import com.teamyutnori.yutnori.reconnect.TurnTimeoutEvent;
 import com.teamyutnori.yutnori.reconnect.TurnTimerService;
+import com.teamyutnori.yutnori.reward.RewardPolicy;
+import com.teamyutnori.yutnori.reward.RewardService;
 import com.teamyutnori.yutnori.ws.RoomBroadcaster;
 import com.teamyutnori.yutnori.ws.dto.MessageType;
 import com.teamyutnori.yutnori.ws.dto.WsMessages.GameEndedMessage;
+import com.teamyutnori.yutnori.ws.dto.WsMessages.RankingEntry;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -50,6 +56,9 @@ import static com.teamyutnori.yutnori.game.exception.GameErrorCode.*;
 //    시간이 다 되면 TurnTimeoutEvent를 받아 처리한다 (onTimerExpired)
 //  - GameEndPort(재접속 담당이 정의): 끊김 기권 처리에서 게임 상태 조회·종료에 쓰도록 이 클래스가 구현한다
 //  - CommandLog(재접속 담당): MOVE_APPLIED를 seq와 함께 기록해 재접속 때 다시 보낼 수 있게 한다
+//  - RewardPolicy·RewardService(골드 담당): 종료 시 순위별 보상 계산·지급
+//  - GameFinishedEvent: 종료 시 발행 (업적 집계용)
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class GameService implements GameEndPort {
@@ -65,6 +74,9 @@ public class GameService implements GameEndPort {
     private final BoardLayoutRepository boardLayouts;
     private final CommandLog commandLog;
     private final AugmentEffects augmentEffects;
+    private final RewardPolicy rewardPolicy;
+    private final RewardService rewardService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // ═══════════ 2번(RoomService) → 게임 시작 ═══════════
 
@@ -236,7 +248,7 @@ public class GameService implements GameEndPort {
             long seq = broadcaster.broadcast(session.getRoomCode(), MessageType.MOVE_APPLIED, applied);
             commandLog.append(session.getRoomCode(), seq, MessageType.MOVE_APPLIED, team, applied);
 
-            // 팀 말이 전부 들어왔으면 승리 (MVP: 먼저 다 들어온 팀이 이김. 순위 보상은 이후 작업)
+            // 팀 말이 전부 들어왔으면 승리. 나머지 팀은 들어온 말 수로 순위 (GameRanking)
             if (session.getBoardState().teamFinished(team)) {
                 finishGame(session, team, GameEndReason.FINISHED);
                 return;
@@ -355,13 +367,24 @@ public class GameService implements GameEndPort {
         }
     }
 
-    // 게임 안에서 끝났을 때(완주·기권): 상태 변경 + 타이머 취소 + GAME_ENDED 전송
+    // 게임 안에서 끝났을 때(완주·기권·끊김):
+    // 상태 변경 + 타이머 취소 → 순위 계산 → 골드 지급 → GAME_ENDED 전송 → 종료 이벤트 발행
     private void finishGame(GameSession session, int winnerTeam, GameEndReason reason) {
         session.setPhase(GamePhase.ENDED);
         session.setWinnerTeam(winnerTeam);
         turnTimerService.cancel(session.getRoomCode());
+
+        List<RankingEntry> rankings = GameRanking.build(session, winnerTeam, rewardPolicy);
+        // 지급이 실패해도 게임 종료 메시지는 보내야 하므로 예외는 로그만 남긴다
+        try {
+            rewardService.grant(rankings);
+        } catch (RuntimeException e) {
+            log.error("[Reward] 보상 지급 실패 room={}", session.getRoomCode(), e);
+        }
+
         broadcaster.broadcast(session.getRoomCode(), MessageType.GAME_ENDED,
-                new GameEndedMessage(winnerTeam, reason));
+                new GameEndedMessage(winnerTeam, reason, rankings));
+        eventPublisher.publishEvent(new GameFinishedEvent(session.getRoomCode(), winnerTeam, reason, rankings));
     }
 
     // 새 턴 알림 + 턴 타이머 시작 (start는 이전 타이머를 취소하고 새로 건다)

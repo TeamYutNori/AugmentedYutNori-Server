@@ -18,12 +18,15 @@ import com.teamyutnori.yutnori.game.yut.YutResult;
 import com.teamyutnori.yutnori.game.yut.YutThrowService;
 import com.teamyutnori.yutnori.reconnect.CommandLog;
 import com.teamyutnori.yutnori.reconnect.TurnTimerService;
+import com.teamyutnori.yutnori.reward.RewardPolicy;
+import com.teamyutnori.yutnori.reward.RewardService;
 import com.teamyutnori.yutnori.ws.RoomBroadcaster;
 import com.teamyutnori.yutnori.ws.dto.MessageType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 import java.util.Map;
@@ -64,7 +67,8 @@ class GameServiceMoveTest {
         service = new GameService(repository, new TurnManager(), mock(YutThrowService.class),
                 mock(AugmentDraftService.class), mock(RethrowValidator.class), broadcaster,
                 mock(GameProperties.class), mock(TurnTimerService.class), TestBoards.repository(), commandLog,
-                mock(AugmentEffects.class));
+                mock(AugmentEffects.class), new RewardPolicy(), mock(RewardService.class),
+                mock(ApplicationEventPublisher.class));
     }
 
     // 개(2칸)로 내 말(0번)을 2번 칸으로
