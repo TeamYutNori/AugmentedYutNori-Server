@@ -23,9 +23,9 @@ public class TurnManager {
     // 사냥꾼이 잡았을 때 받는 추가 던지기 수 (Unity HunterAugment.CaptureBonusThrows)
     static final int HUNTER_CAPTURE_BONUS = 2;
 
-    // 증강 선택이 끝난 뒤 첫 턴
+    // 증강 선택이 끝난 뒤 첫 턴 (나간 팀은 건너뜀)
     public void startFirstTurn(GameSession s) {
-        s.setCurrentTeam(0);
+        s.setCurrentTeam(firstActiveFrom(s, 0));
         resetTurn(s);
     }
 
@@ -106,11 +106,20 @@ public class TurnManager {
         return false;
     }
 
-    // 다음 팀으로 (Unity NextTurn)
+    // 다음 팀으로 (Unity NextTurn). 나간 팀은 건너뛴다
     public void nextTurn(GameSession s) {
-        int next = (s.getCurrentTeam() + 1) % s.getSetup().teamCount();
-        s.setCurrentTeam(next);
+        s.setCurrentTeam(firstActiveFrom(s, s.getCurrentTeam() + 1));
         resetTurn(s);
+    }
+
+    // start부터 차례로 보며 아직 남아 있는 첫 팀
+    private int firstActiveFrom(GameSession s, int start) {
+        int teamCount = s.getSetup().teamCount();
+        for (int i = 0; i < teamCount; i++) {
+            int team = (start + i) % teamCount;
+            if (!s.isRemoved(team)) return team;
+        }
+        return start % teamCount;   // 모두 나간 경우 (게임은 GameService가 이미 끝낸다)
     }
 
     // ── 내부 ──

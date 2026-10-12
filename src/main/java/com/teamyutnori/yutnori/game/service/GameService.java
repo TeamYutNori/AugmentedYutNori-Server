@@ -29,13 +29,20 @@ import com.teamyutnori.yutnori.reconnect.GameEndPort;
 import com.teamyutnori.yutnori.reconnect.TimerType;
 import com.teamyutnori.yutnori.reconnect.TurnTimeoutEvent;
 import com.teamyutnori.yutnori.reconnect.TurnTimerService;
+import com.teamyutnori.yutnori.reward.RewardPolicy;
+import com.teamyutnori.yutnori.reward.RewardService;
 import com.teamyutnori.yutnori.ws.RoomBroadcaster;
 import com.teamyutnori.yutnori.ws.dto.MessageType;
 import com.teamyutnori.yutnori.ws.dto.WsMessages.GameEndedMessage;
+import com.teamyutnori.yutnori.ws.dto.WsMessages.PlayerRemovedMessage;
+import com.teamyutnori.yutnori.ws.dto.WsMessages.RankingEntry;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -48,8 +55,11 @@ import static com.teamyutnori.yutnori.game.exception.GameErrorCode.*;
 // 다른 담당과의 연결
 //  - TurnTimerService(재접속·타이머 담당): 턴이 바뀌면 start, 증강 선택 시작 시 startAugmentSelect, 끝나면 cancel
 //    시간이 다 되면 TurnTimeoutEvent를 받아 처리한다 (onTimerExpired)
-//  - GameEndPort(재접속 담당이 정의): 끊김 기권 처리에서 게임 상태 조회·종료에 쓰도록 이 클래스가 구현한다
+//  - GameEndPort(재접속 담당이 정의): 끊김 처리에서 게임 상태 조회·플레이어 제거(removePlayer)에 쓰도록 이 클래스가 구현한다
 //  - CommandLog(재접속 담당): MOVE_APPLIED를 seq와 함께 기록해 재접속 때 다시 보낼 수 있게 한다
+//  - RewardPolicy·RewardService(골드 담당): 종료 시 순위별 보상 계산·지급
+//  - GameFinishedEvent: 종료 시 발행 (업적 집계용)
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class GameService implements GameEndPort {
@@ -65,6 +75,9 @@ public class GameService implements GameEndPort {
     private final BoardLayoutRepository boardLayouts;
     private final CommandLog commandLog;
     private final AugmentEffects augmentEffects;
+    private final RewardPolicy rewardPolicy;
+    private final RewardService rewardService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // ═══════════ 2번(RoomService) → 게임 시작 ═══════════
 
@@ -109,9 +122,7 @@ public class GameService implements GameEndPort {
             } else {
                 // 줄 수 있는 후보가 하나도 없으면(증강 목록이 비어 있는 경우 등) 선택 단계를 건너뛰고 바로 시작한다.
                 // 이 처리가 없으면 아무도 고를 수 없어서 AUGMENT_SELECT 단계에서 영원히 멈춘다
-                session.setPhase(GamePhase.PLAYING);
-                turnManager.startFirstTurn(session);
-                broadcastTurnChanged(session);
+                startPlaying(session);
             }
         }
     }
@@ -236,7 +247,7 @@ public class GameService implements GameEndPort {
             long seq = broadcaster.broadcast(session.getRoomCode(), MessageType.MOVE_APPLIED, applied);
             commandLog.append(session.getRoomCode(), seq, MessageType.MOVE_APPLIED, team, applied);
 
-            // 팀 말이 전부 들어왔으면 승리 (MVP: 먼저 다 들어온 팀이 이김. 순위 보상은 이후 작업)
+            // 팀 말이 전부 들어왔으면 승리. 나머지 팀은 들어온 말 수로 순위 (GameRanking)
             if (session.getBoardState().teamFinished(team)) {
                 finishGame(session, team, GameEndReason.FINISHED);
                 return;
@@ -289,14 +300,9 @@ public class GameService implements GameEndPort {
         }
     }
 
-    // 기권·재접속 실패 (MVP는 2팀이라 남은 팀이 승리)
-    public void forfeit(String roomCode, int loserTeam, GameEndReason reason) {
-        GameSession session = getSession(roomCode);
-        synchronized (session) {
-            if (session.getPhase() == GamePhase.ENDED) return;
-            int winner = (loserTeam + 1) % session.getSetup().teamCount();
-            finishGame(session, winner, reason);
-        }
+    // LEAVE_ROOM: 게임 중에 방을 나가면 그 플레이어만 빼고 계속 (LeaveRoomWsHandler가 호출)
+    public boolean leaveGame(String roomCode, String playerId) {
+        return removeFromGame(roomCode, playerId, GameEndReason.FORFEIT);
     }
 
     // 결과 기록·정리가 끝난 뒤 세션 삭제
@@ -326,6 +332,13 @@ public class GameService implements GameEndPort {
 
     // 게임 종료 상태로만 바꾼다.
     // GAME_ENDED 전송과 타이머 취소는 DisconnectTimeoutHandler가 직접 하므로 여기서 또 하면 종료 메시지가 두 번 나간다
+    // 재접속 유예시간 초과: 그 플레이어만 빼고 계속, 1명 남으면 종료
+    // true = 여기서 처리함 (DisconnectTimeoutHandler는 따로 GAME_ENDED를 보내지 않는다)
+    @Override
+    public boolean removePlayer(String roomCode, String playerId) {
+        return removeFromGame(roomCode, playerId, GameEndReason.DISCONNECTED);
+    }
+
     @Override
     public void endGame(String roomCode, int winnerTeam) {
         sessionRepository.find(roomCode).ifPresent(session -> {
@@ -349,19 +362,72 @@ public class GameService implements GameEndPort {
 
         // 모든 팀이 골랐으면 게임 시작
         if (!session.hasAnyPendingOffer()) {
-            session.setPhase(GamePhase.PLAYING);
-            turnManager.startFirstTurn(session);
-            broadcastTurnChanged(session);
+            startPlaying(session);
         }
     }
 
-    // 게임 안에서 끝났을 때(완주·기권): 상태 변경 + 타이머 취소 + GAME_ENDED 전송
+    // 증강 선택 끝 → 첫 턴 시작
+    private void startPlaying(GameSession session) {
+        session.setPhase(GamePhase.PLAYING);
+        turnManager.startFirstTurn(session);
+        broadcastTurnChanged(session);
+    }
+
+    // 나가기·끊김 공통 처리
+    //  1) 나간 팀 표시 + 판에서 그 팀 말 제거 + 증강 후보 정리
+    //  2) PLAYER_REMOVED 전송
+    //  3) 남은 팀이 1팀 이하 → 종료 (남은 팀 1등, 나간 팀은 꼴찌·보상 0)
+    //     증강 선택 중이고 남은 팀이 다 골랐으면 → 게임 시작
+    //     나간 팀의 턴이었으면 → 다음 팀으로
+    // 반환: 처리했으면 true. 없는 방·이 게임 참가자가 아니면 false
+    private boolean removeFromGame(String roomCode, String playerId, GameEndReason reason) {
+        Optional<GameSession> found = sessionRepository.find(roomCode);
+        if (found.isEmpty()) return false;
+        GameSession session = found.get();
+        synchronized (session) {
+            Optional<Integer> foundTeam = session.teamOf(playerId);
+            if (foundTeam.isEmpty()) return false;
+            int team = foundTeam.get();
+            // 이미 끝났거나 이미 뺀 플레이어면 할 일 없음 (중복 처리 방지)
+            if (session.getPhase() == GamePhase.ENDED || session.isRemoved(team)) return true;
+
+            session.markRemoved(team);
+            session.getBoardState().removeTeam(team);
+            session.clearOffered(team);
+            broadcaster.broadcast(roomCode, MessageType.PLAYER_REMOVED,
+                    new PlayerRemovedMessage(playerId, team, reason));
+
+            List<Integer> active = session.activeTeams();
+            if (active.size() <= 1) {
+                finishGame(session, active.isEmpty() ? -1 : active.get(0), reason);
+            } else if (session.getPhase() == GamePhase.AUGMENT_SELECT) {
+                if (!session.hasAnyPendingOffer()) startPlaying(session);
+            } else if (session.getCurrentTeam() == team) {
+                turnManager.nextTurn(session);
+                broadcastTurnChanged(session);
+            }
+            return true;
+        }
+    }
+
+    // 게임 안에서 끝났을 때(완주·기권·끊김):
+    // 상태 변경 + 타이머 취소 → 순위 계산 → 골드 지급 → GAME_ENDED 전송 → 종료 이벤트 발행
     private void finishGame(GameSession session, int winnerTeam, GameEndReason reason) {
         session.setPhase(GamePhase.ENDED);
         session.setWinnerTeam(winnerTeam);
         turnTimerService.cancel(session.getRoomCode());
+
+        List<RankingEntry> rankings = GameRanking.build(session, winnerTeam, rewardPolicy);
+        // 지급이 실패해도 게임 종료 메시지는 보내야 하므로 예외는 로그만 남긴다
+        try {
+            rewardService.grant(rankings);
+        } catch (RuntimeException e) {
+            log.error("[Reward] 보상 지급 실패 room={}", session.getRoomCode(), e);
+        }
+
         broadcaster.broadcast(session.getRoomCode(), MessageType.GAME_ENDED,
-                new GameEndedMessage(winnerTeam, reason));
+                new GameEndedMessage(winnerTeam, reason, rankings));
+        eventPublisher.publishEvent(new GameFinishedEvent(session.getRoomCode(), winnerTeam, reason, rankings));
     }
 
     // 새 턴 알림 + 턴 타이머 시작 (start는 이전 타이머를 취소하고 새로 건다)

@@ -70,6 +70,20 @@ public class BoardState {
         return hasPiece;
     }
 
+    // 팀별 들어온(완주한) 말 수 → 게임이 끝날 때 순위 계산에 쓴다
+    public int finishedCount(int team) {
+        int count = 0;
+        for (Piece piece : pieces.values()) {
+            if (piece.getTeam() == team && piece.isFinished()) count++;
+        }
+        return count;
+    }
+
+    // 나간 팀의 말을 판에서 없앤다 → 잡기·업기·이동 계산에서 빠진다 (Unity BoardState.RemoveTeam)
+    public void removeTeam(int team) {
+        pieces.values().removeIf(piece -> piece.getTeam() == team);
+    }
+
     // ---------- 증강 ----------
 
     // priority 순으로 끼워 넣는다 (같으면 등록 순서). 클라와 호출 순서가 같아야 결과가 같다
