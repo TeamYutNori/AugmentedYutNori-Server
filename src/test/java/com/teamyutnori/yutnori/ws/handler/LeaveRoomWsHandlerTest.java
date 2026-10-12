@@ -1,6 +1,5 @@
 package com.teamyutnori.yutnori.ws.handler;
 
-import com.teamyutnori.yutnori.game.model.GameEndReason;
 import com.teamyutnori.yutnori.game.service.GameService;
 import com.teamyutnori.yutnori.room.model.Room;
 import com.teamyutnori.yutnori.room.service.RoomService;
@@ -9,16 +8,14 @@ import com.teamyutnori.yutnori.ws.WsMessageContext;
 import com.teamyutnori.yutnori.ws.dto.MessageType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.util.Optional;
+import org.mockito.InOrder;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-// LEAVE_ROOM: 대기실 나가기는 그대로, 게임 중이면 removePlayer → 안 되면 기권(FORFEIT) 처리하는지 검증한다
+// LEAVE_ROOM: 대기실 나가기는 그대로, 게임 중이면 leaveGame(FORFEIT)으로 게임에서도 빼는지 검증한다
 class LeaveRoomWsHandlerTest {
 
     private static final String ROOM = "ROOM";
@@ -49,43 +46,20 @@ class LeaveRoomWsHandlerTest {
 
         handler.handle(context, null);
 
-        verify(gameService, never()).removePlayer(anyString(), anyString());
-        verify(gameService, never()).forfeit(anyString(), anyInt(), any());
+        verify(gameService, never()).leaveGame(anyString(), anyString());
         verify(roomService).leaveRoom(ROOM, PLAYER);
         verify(broadcaster).broadcast(eq(ROOM), eq(MessageType.ROOM_STATE), any());
     }
 
     @Test
-    void 게임_중이고_removePlayer가_처리하면_기권하지_않는다() {
+    void 게임_중이면_게임에서_빼고_방에서도_나간다() {
         when(gameService.isPlaying(ROOM)).thenReturn(true);
-        when(gameService.removePlayer(ROOM, PLAYER)).thenReturn(true);
 
         handler.handle(context, null);
 
-        verify(gameService, never()).forfeit(anyString(), anyInt(), any());
-        verify(roomService).leaveRoom(ROOM, PLAYER);
-    }
-
-    @Test
-    void 게임_중이고_removePlayer가_없으면_FORFEIT으로_기권한다() {
-        when(gameService.isPlaying(ROOM)).thenReturn(true);
-        when(gameService.removePlayer(ROOM, PLAYER)).thenReturn(false);
-        when(gameService.findTeam(ROOM, PLAYER)).thenReturn(Optional.of(1));
-
-        handler.handle(context, null);
-
-        verify(gameService).forfeit(ROOM, 1, GameEndReason.FORFEIT);
-        verify(roomService).leaveRoom(ROOM, PLAYER);
-    }
-
-    @Test
-    void 게임_중인데_팀을_못_찾으면_기권하지_않고_방에서만_나간다() {
-        when(gameService.isPlaying(ROOM)).thenReturn(true);
-        when(gameService.findTeam(ROOM, PLAYER)).thenReturn(Optional.empty());
-
-        handler.handle(context, null);
-
-        verify(gameService, never()).forfeit(anyString(), anyInt(), any());
-        verify(roomService).leaveRoom(ROOM, PLAYER);
+        InOrder inOrder = inOrder(gameService, roomService);
+        inOrder.verify(gameService).leaveGame(ROOM, PLAYER);
+        inOrder.verify(roomService).leaveRoom(ROOM, PLAYER);
+        verify(broadcaster).broadcast(eq(ROOM), eq(MessageType.ROOM_STATE), any());
     }
 }
