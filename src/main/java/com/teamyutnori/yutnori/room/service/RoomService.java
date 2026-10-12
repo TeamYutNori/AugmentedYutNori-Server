@@ -12,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -103,6 +105,37 @@ public class RoomService {
             // 클라이언트에서 전달한 준비 상태로 변경
             member.setReady(ready);
             return room;
+        }
+    }
+
+    // 게임 시작 조건 확인과 상태 변경을 한 번에 처리
+    public boolean tryStartGame(String roomCode) {
+        Room room = getRoomOrThrow(roomCode);
+        synchronized (room) {
+            // 이미 시작된 방이면 다시 시작하지 않음
+            if (room.getStatus() != RoomStatus.WAITING) {
+                return false;
+            }
+            // 최대 인원이 모두 참가하고 전원이 준비되어 있어야 시작 가능
+            if (!room.hasEnoughPlayers() || !room.isAllReady()) {
+                return false;
+            }
+            // 조건을 만족한 첫 요청만 방 상태를 PLAYING으로 변경
+            room.startGame();
+            return true;
+        }
+    }
+
+    // GameService에 전달하기 위한 playerId → team 정보 생성
+    public Map<String, Integer> getPlayerTeams(String roomCode) {
+        Room room = getRoomOrThrow(roomCode);
+        synchronized (room) {
+            return room.getMembers()
+                    .stream()
+                    .collect(Collectors.toMap(
+                            RoomMember::getPlayerId,
+                            RoomMember::getTeam
+                    ));
         }
     }
 

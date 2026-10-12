@@ -66,10 +66,18 @@ public class Room {
                 .orElse(null);
     }
 
+    // 모든 참가자가 준비 상태인지 확인
+    public boolean isAllReady() {
+        return !members.isEmpty() && members.stream().allMatch(RoomMember::isReady);
+    }
+
     // 현재 방 인원
     public int getCurrentPlayers() {
         return members.size();
     }
+
+    // 게임 시작에 필요한 인원이 모두 들어왔는지 확인
+    public boolean hasEnoughPlayers() { return members.size() == maxPlayers; }
 
     // 방이 가득 찼는지 확인
     public boolean isFull() {
