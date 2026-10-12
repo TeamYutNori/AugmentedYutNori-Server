@@ -154,18 +154,7 @@ public class GameService implements GameEndPort {
             if (session.getRemainingThrows() <= 0) {
                 throw new InvalidRequestException(NO_THROWS_LEFT, "남은 던지기 횟수가 없습니다.");
             }
-
-            YutThrowOutcome outcome = yutThrowService.throwYut();
-            turnManager.applyThrow(session, outcome.result());   // 도박사면 저장값만 도↔모로 바뀐다
-
-            // 원래 결과를 보낸다. 도박사 변환은 클라가 직접 한다 (Unity GameRules.ApplyThrow)
-            broadcaster.broadcast(session.getRoomCode(), MessageType.THROW_RESULT,
-                    new ThrowResultMessage(team, outcome.sticks(), outcome.result(), false));
-
-            // 더 던질 것도, 움직일 말도 없으면 바로 다음 팀 (예: 판에 말이 없는데 빽도)
-            if (turnManager.endTurnIfNoAction(session)) {
-                broadcastTurnChanged(session);
-            }
+            doThrow(session, team);
         }
     }
 
@@ -229,34 +218,7 @@ public class GameService implements GameEndPort {
             if (!session.getSetup().isValidPieceId(pieceId) || GameSetup.teamOf(pieceId) != team) {
                 throw new ForbiddenException(NOT_YOUR_PIECE, "자기 팀 말만 움직일 수 있습니다: " + pieceId);
             }
-            // 던져서 저장된 결과로만 움직일 수 있다
-            boolean hasResult = session.getStoredResults().stream().anyMatch(r -> r.steps() == request.moveCount());
-            if (!hasResult) {
-                throw new InvalidRequestException(INVALID_MOVE_RESULT,
-                        "저장된 윷 결과 중 " + request.moveCount() + "칸 결과가 없습니다.");
-            }
-
-            // 판 규칙상 그 칸으로 갈 수 있을 때만 적용 (지름길·빽도·증강 보정 포함)
-            MoveResult result = session.getBoardState()
-                    .tryMove(pieceId, request.moveCount(), request.destinationNodeId())
-                    .orElseThrow(() -> new InvalidRequestException(INVALID_MOVE,
-                            "갈 수 없는 칸입니다: 말 " + pieceId + ", " + request.moveCount() + "칸 → " + request.destinationNodeId()));
-
-            // 재접속 시 놓친 이동을 다시 보낼 수 있게 seq와 함께 기록 (재접속 담당 CommandLog)
-            MoveAppliedMessage applied = MoveAppliedMessage.of(team, result, request.stateHash());
-            long seq = broadcaster.broadcast(session.getRoomCode(), MessageType.MOVE_APPLIED, applied);
-            commandLog.append(session.getRoomCode(), seq, MessageType.MOVE_APPLIED, team, applied);
-
-            // 팀 말이 전부 들어왔으면 승리. 나머지 팀은 들어온 말 수로 순위 (GameRanking)
-            if (session.getBoardState().teamFinished(team)) {
-                finishGame(session, team, GameEndReason.FINISHED);
-                return;
-            }
-
-            // 쓴 윷 결과 제거, 잡으면 한 번 더, 남은 행동 없으면 다음 팀
-            if (turnManager.afterMove(session, result)) {
-                broadcastTurnChanged(session);
-            }
+            doMove(session, team, pieceId, request.moveCount(), request.destinationNodeId(), request.stateHash(), false);
         }
     }
 
@@ -279,6 +241,12 @@ public class GameService implements GameEndPort {
         synchronized (session) {
             if (session.getPhase() != GamePhase.PLAYING) return;
             if (session.getCurrentTeam() != team) return;   // 그 사이 턴이 이미 바뀌었으면 무시 (이중 안전장치)
+
+            // 연결이 끊긴 팀이면 넘기지 않고 서버가 대신 둔다 (AutoPlayService가 받아서 진행)
+            if (session.isAuto(team)) {
+                eventPublisher.publishEvent(new AutoTurnEvent(roomCode, team));
+                return;
+            }
             turnManager.nextTurn(session);
             broadcastTurnChanged(session);
         }
@@ -348,6 +316,70 @@ public class GameService implements GameEndPort {
                 session.setWinnerTeam(winnerTeam);
             }
         });
+    }
+
+    // ═══════════ 던지기·이동 실제 처리 (사람 요청과 자동 진행이 같이 쓴다) ═══════════
+    // 호출하는 쪽이 synchronized (session) 안에서, 차례·남은 던지기 같은 검증을 끝낸 뒤 부른다
+    // 같은 코드를 타므로 증강 규칙(도박사·사냥꾼·이동 증강)이 사람과 자동 진행에 똑같이 적용된다
+
+    // 던지기 → THROW_RESULT → 할 게 없으면 다음 팀
+    void doThrow(GameSession session, int team) {
+        YutThrowOutcome outcome = yutThrowService.throwYut();
+        turnManager.applyThrow(session, outcome.result());   // 도박사면 저장값만 도↔모로 바뀐다
+
+        // 원래 결과를 보낸다. 도박사 변환은 클라가 직접 한다 (Unity GameRules.ApplyThrow)
+        broadcaster.broadcast(session.getRoomCode(), MessageType.THROW_RESULT,
+                new ThrowResultMessage(team, outcome.sticks(), outcome.result(), false));
+
+        // 더 던질 것도, 움직일 말도 없으면 바로 다음 팀 (예: 판에 말이 없는데 빽도)
+        if (turnManager.endTurnIfNoAction(session)) {
+            broadcastTurnChanged(session);
+        }
+    }
+
+    // 이동 → MOVE_APPLIED(+CommandLog) → 완주면 종료, 아니면 턴 처리
+    // auto: 서버가 대신 둔 이동이면 true (보낸 클라가 없으니 stateHash는 null)
+    void doMove(GameSession session, int team, int pieceId, int moveCount, int destinationNodeId,
+                String stateHash, boolean auto) {
+        // 던져서 저장된 결과로만 움직일 수 있다
+        boolean hasResult = session.getStoredResults().stream().anyMatch(r -> r.steps() == moveCount);
+        if (!hasResult) {
+            throw new InvalidRequestException(INVALID_MOVE_RESULT,
+                    "저장된 윷 결과 중 " + moveCount + "칸 결과가 없습니다.");
+        }
+
+        // 판 규칙상 그 칸으로 갈 수 있을 때만 적용 (지름길·빽도·증강 보정 포함)
+        MoveResult result = session.getBoardState()
+                .tryMove(pieceId, moveCount, destinationNodeId)
+                .orElseThrow(() -> new InvalidRequestException(INVALID_MOVE,
+                        "갈 수 없는 칸입니다: 말 " + pieceId + ", " + moveCount + "칸 → " + destinationNodeId));
+
+        // 재접속 시 놓친 이동을 다시 보낼 수 있게 seq와 함께 기록 (재접속 담당 CommandLog)
+        MoveAppliedMessage applied = MoveAppliedMessage.of(team, result, stateHash, auto);
+        long seq = broadcaster.broadcast(session.getRoomCode(), MessageType.MOVE_APPLIED, applied);
+        commandLog.append(session.getRoomCode(), seq, MessageType.MOVE_APPLIED, team, applied);
+
+        // 팀 말이 전부 들어왔으면 승리. 나머지 팀은 들어온 말 수로 순위 (GameRanking)
+        if (session.getBoardState().teamFinished(team)) {
+            finishGame(session, team, GameEndReason.FINISHED);
+            return;
+        }
+
+        // 쓴 윷 결과 제거, 잡으면 한 번 더, 남은 행동 없으면 다음 팀
+        if (turnManager.afterMove(session, result)) {
+            broadcastTurnChanged(session);
+        }
+    }
+
+    // 자동 진행을 멈추고 지금 팀에게 턴을 돌려줄 때 (재접속): 타이머를 새로 걸고 TURN_CHANGED로 상태를 다시 알린다
+    void resumeTurn(GameSession session) {
+        broadcastTurnChanged(session);
+    }
+
+    // 자동 진행이 더 할 수 없을 때 강제로 다음 팀
+    void forceNextTurn(GameSession session) {
+        turnManager.nextTurn(session);
+        broadcastTurnChanged(session);
     }
 
     // ═══════════ 내부 처리 ═══════════

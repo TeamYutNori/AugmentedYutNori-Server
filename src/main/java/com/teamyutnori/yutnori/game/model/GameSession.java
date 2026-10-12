@@ -44,6 +44,9 @@ public class GameSession {
     // ── 퇴장 ──
     private final Set<Integer> removedTeams = new LinkedHashSet<>();   // 나간 팀 (나간 순서대로)
 
+    // ── 자동 진행 ──
+    private final Set<Integer> autoTeams = new HashSet<>();   // 연결이 끊겨 서버가 대신 두는 팀
+
     // board: BoardLayoutRepository.create()로 이 게임 전용으로 만든 판 (GameService.startGame에서 넘겨줌)
     public GameSession(String roomCode, GameSetup setup, Map<String, Integer> playerTeams, BoardGraph board) {
         this.roomCode = roomCode;
@@ -71,6 +74,13 @@ public class GameSession {
     // ── 퇴장 ──
     public boolean isRemoved(int team) { return removedTeams.contains(team); }
     public void markRemoved(int team)  { removedTeams.add(team); }
+
+    // ── 자동 진행 (끊김 → 켬, 재접속 → 끔) ──
+    public boolean isAuto(int team) { return autoTeams.contains(team); }
+    public void setAuto(int team, boolean auto) {
+        if (auto) autoTeams.add(team);
+        else autoTeams.remove(team);
+    }
 
     // 아직 게임에 남아 있는 팀 (팀 번호 순)
     public List<Integer> activeTeams() {
