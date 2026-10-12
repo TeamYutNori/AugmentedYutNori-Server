@@ -20,6 +20,11 @@ public final class WsMessages {
     public record PlayerDisconnectedMessage(String playerId, int graceSec) {}
     public record PlayerReconnectedMessage(String playerId) {}
 
+    // 플레이어 제거 (게임 중 나가기·재접속 유예시간 초과)
+    // reason: FORFEIT = 나가기, DISCONNECTED = 재접속 실패
+    // 1명만 남아 게임이 끝나면 PLAYER_REMOVED를 먼저 보내고 GAME_ENDED를 보낸다
+    public record PlayerRemovedMessage(String playerId, int team, GameEndReason reason) {}
+
     // 게임 결과 한 줄 (플레이어 = 팀). rank는 이번 판 등수(1부터, 같은 등수 다음은 건너뜀)
     // 기권·끊김으로 나간 플레이어는 꼴찌 등수 + rewardGold 0
     public record RankingEntry(String playerId, int team, int rank, int rewardGold) {}
