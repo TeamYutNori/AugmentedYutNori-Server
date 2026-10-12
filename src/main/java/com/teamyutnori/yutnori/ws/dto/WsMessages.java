@@ -1,5 +1,6 @@
 package com.teamyutnori.yutnori.ws.dto;
 
+import com.teamyutnori.yutnori.game.board.PieceState;
 import com.teamyutnori.yutnori.game.model.GameEndReason;
 import com.teamyutnori.yutnori.game.model.GamePhase;
 import com.teamyutnori.yutnori.game.yut.YutResult;
@@ -19,6 +20,7 @@ public final class WsMessages {
     public record ErrorMessage(String code, String message) {}
     public record PlayerDisconnectedMessage(String playerId, int graceSec) {}
     public record PlayerReconnectedMessage(String playerId) {}
+    public record PieceSnapshot(int pieceId, int team, PieceState state, int nodeId, Integer cameFromNodeId) {}
 
     // 플레이어 제거 (게임 중 나가기·재접속 유예시간 초과)
     // reason: FORFEIT = 나가기, DISCONNECTED = 재접속 실패
@@ -49,6 +51,7 @@ public final class WsMessages {
             int remainingThrows,
             int turnNumber,
             List<YutResult> storedResults,
+            List<PieceSnapshot> pieces,
             Map<Integer, List<String>> ownedAugments,
             List<String> offeredAugments,
             Integer winnerTeam,

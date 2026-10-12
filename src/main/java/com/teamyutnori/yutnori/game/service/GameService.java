@@ -350,6 +350,13 @@ public class GameService implements GameEndPort {
         });
     }
 
+    @Override
+    public boolean hasLeftGame(String roomCode, String playerId){
+        return sessionRepository.find(roomCode).map(session ->{
+            synchronized (session){ return session.teamOf(playerId).map(session::isRemoved).orElse(false);}
+        }).orElse(false);
+    }
+
     // ═══════════ 내부 처리 ═══════════
 
     private void confirmAugment(GameSession session, int team, String augmentId, boolean autoSelected) {

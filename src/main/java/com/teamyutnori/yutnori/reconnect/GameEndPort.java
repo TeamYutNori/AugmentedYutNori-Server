@@ -16,4 +16,9 @@ public interface GameEndPort {
     default boolean removePlayer(String roomCode, String playerId) {
         return false;
     }
+
+    // 이 게임에서 이미 빠진 플레이어인지
+    default boolean hasLeftGame(String roomCode, String playerId){
+        return false;
+    }
 }

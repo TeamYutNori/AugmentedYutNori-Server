@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ScheduledFuture;
 
 @Slf4j
@@ -32,18 +33,22 @@ public class ConnectionCleanup {
     private final TaskScheduler scheduler;
     private final Clock clock;
     private final ApplicationEventPublisher publisher;
+    private final Optional<GameEndPort> gameEndPort;
+
 
     private final Map<Key, Waiting> waitings = new HashMap<>();
     private long nextId = 1;
 
     public ConnectionCleanup(RoomBroadcaster broadcaster, RoomSessionRegistry registry, GameProperties gameProperties,
-                             @Qualifier("turnTimerScheduler") TaskScheduler scheduler, Clock clock, ApplicationEventPublisher publisher) {
+                             @Qualifier("turnTimerScheduler") TaskScheduler scheduler, Clock clock,
+                             ApplicationEventPublisher publisher, Optional<GameEndPort> gameEndPort) {
         this.broadcaster = broadcaster;
         this.registry = registry;
         this.gameProperties = gameProperties;
         this.scheduler = scheduler;
         this.clock = clock;
         this.publisher = publisher;
+        this.gameEndPort = gameEndPort;
     }
 
     public void onDisconnected(WsMessageContext context){
@@ -51,6 +56,11 @@ public class ConnectionCleanup {
         String playerId = context.playerId();
 
         if(registry.find(roomCode, playerId).isPresent()) return;
+
+        if(hasLeftGame(roomCode, playerId)){
+            log.info("이미 게임에서 나간 플레이어라 끊김 처리 생략 room={}, player={}", roomCode, playerId);
+            return;
+        }
 
         Key key = new Key(roomCode, playerId);
         synchronized (this){
@@ -112,5 +122,9 @@ public class ConnectionCleanup {
         }
         log.info("재접속 대기 시간 초과 room={} player={}", key.roomCode(), key.playerId());
         publisher.publishEvent(new DisconnectTimeoutEvent(key.roomCode(), key.playerId()));
+    }
+
+    private boolean hasLeftGame(String roomCode, String playerId){
+        return gameEndPort.map(game -> game.hasLeftGame(roomCode, playerId)).orElse(false);
     }
 }

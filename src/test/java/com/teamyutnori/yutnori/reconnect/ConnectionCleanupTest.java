@@ -34,7 +34,7 @@ class ConnectionCleanupTest {
     private RoomSessionRegistry registry;
     private List<Object> events;
     private ConnectionCleanup cleanup;
-
+    private GameProperties properties;
     private final WsMessageContext p1 = new WsMessageContext(null, ROOM, "p1", null);
     private final WsMessageContext p2 = new WsMessageContext(null, ROOM, "p2", null);
 
@@ -47,10 +47,10 @@ class ConnectionCleanupTest {
         when(registry.find(any(), any())).thenReturn(Optional.empty());   // 기본: 연결 없음
         events = new CopyOnWriteArrayList<>();
 
-        GameProperties properties = new GameProperties(
+        properties = new GameProperties(                                  // 앞의 "GameProperties " 제거
                 2, 2, Duration.ofSeconds(30), 3, Duration.ofSeconds(20), GRACE);
         cleanup = new ConnectionCleanup(broadcaster, registry, properties, scheduler,
-                Clock.systemUTC(), events::add);
+                Clock.systemUTC(), events::add, Optional.empty());
     }
 
     @AfterEach
@@ -188,5 +188,23 @@ class ConnectionCleanupTest {
         while (count(type) < expected && System.currentTimeMillis() < end) {
             Thread.sleep(10);
         }
+    }
+    // LEAVE_ROOM 등으로 이미 게임에서 빠진 플레이어는 끊겨도 대기·알림·이벤트 없음
+    @Test
+    void leftPlayer() {
+        GameEndPort left = new GameEndPort() {
+            public boolean isPlaying(String roomCode) { return true; }
+            public Optional<Integer> findTeam(String roomCode, String playerId) { return Optional.of(0); }
+            public void endGame(String roomCode, int winnerTeam) {}
+            public boolean hasLeftGame(String roomCode, String playerId) { return true; }
+        };
+        ConnectionCleanup leftCleanup = new ConnectionCleanup(broadcaster, registry, properties,
+                scheduler, Clock.systemUTC(), events::add, Optional.of(left));
+
+        leftCleanup.onDisconnected(p1);
+
+        assertThat(leftCleanup.isWaiting(ROOM, "p1")).isFalse();
+        verify(broadcaster, never()).broadcast(any(), eq(MessageType.PLAYER_DISCONNECTED), any());
+        assertThat(count(PlayerDisconnectedEvent.class)).isZero();
     }
 }
