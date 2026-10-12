@@ -1,6 +1,7 @@
 package com.teamyutnori.yutnori.room.repository;
 
 import com.teamyutnori.yutnori.room.model.Room;
+import com.teamyutnori.yutnori.room.model.RoomStatus;
 import org.springframework.stereotype.Repository;
 
 import java.util.Map;
@@ -36,5 +37,15 @@ public class RoomRepository {
     // 방 존재 여부
     public boolean exists(String code) {
         return rooms.containsKey(code);
+    }
+
+    // 빠른 참가가 가능한 공개 대기방 조회
+    public Optional<Room> findJoinableRoom() {
+        return rooms.values()
+                .stream()
+                .filter(Room::isPublic)
+                .filter(room -> room.getStatus() == RoomStatus.WAITING)
+                .filter(room -> !room.isFull())
+                .findFirst();
     }
 }
