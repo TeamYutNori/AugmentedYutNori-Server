@@ -86,6 +86,7 @@ class GameServiceMoveTest {
         assertThat(applied.movedPieceIds()).containsExactly(0);
         assertThat(applied.capturedPieceIds()).isEmpty();
         assertThat(applied.stateHash()).isEqualTo(HASH);
+        assertThat(applied.auto()).isFalse();
 
         assertThat(commandLog.lastSeq(ROOM)).isEqualTo(5);
         assertThat(session.getBoardState().getPiece(0).getNode().getId()).isEqualTo(2);
