@@ -41,6 +41,9 @@ public class GameSession {
     // ── 결과 ──
     @Setter private Integer winnerTeam;         // 끝나기 전엔 null
 
+    // ── 퇴장 ──
+    private final Set<Integer> removedTeams = new LinkedHashSet<>();   // 나간 팀 (나간 순서대로)
+
     // board: BoardLayoutRepository.create()로 이 게임 전용으로 만든 판 (GameService.startGame에서 넘겨줌)
     public GameSession(String roomCode, GameSetup setup, Map<String, Integer> playerTeams, BoardGraph board) {
         this.roomCode = roomCode;
@@ -56,6 +59,27 @@ public class GameSession {
 
     // ── 참가자 ──
     public Optional<Integer> teamOf(String playerId) { return Optional.ofNullable(playerTeams.get(playerId)); }
+
+    // 팀의 플레이어 id (플레이어 = 팀)
+    public Optional<String> playerOf(int team) {
+        return playerTeams.entrySet().stream()
+                .filter(e -> e.getValue() == team)
+                .map(Map.Entry::getKey)
+                .findFirst();
+    }
+
+    // ── 퇴장 ──
+    public boolean isRemoved(int team) { return removedTeams.contains(team); }
+    public void markRemoved(int team)  { removedTeams.add(team); }
+
+    // 아직 게임에 남아 있는 팀 (팀 번호 순)
+    public List<Integer> activeTeams() {
+        List<Integer> teams = new ArrayList<>();
+        for (int t = 0; t < setup.teamCount(); t++) {
+            if (!removedTeams.contains(t)) teams.add(t);
+        }
+        return teams;
+    }
 
     // ── 제시 후보 ──
     public void setOffered(int team, List<String> ids) { offeredAugments.put(team, List.copyOf(ids)); }
