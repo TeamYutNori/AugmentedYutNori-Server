@@ -48,6 +48,10 @@ public class Player {
     @ColumnDefault("0")
     private int gold;
 
+    // 프로필에 표시할 아이콘 id (profile-icons.json의 id). 아직 고르지 않았으면 값이 없음
+    @Column(length = 64)
+    private String selectedIconId;
+
     // 게스트 플레이어 생성
     public static Player createGuest(
             String playerId,
@@ -81,6 +85,11 @@ public class Player {
     // 닉네임 설정 또는 변경
     public void changeNickname(String nickname) {
         this.nickname = nickname;
+    }
+
+    // 프로필 아이콘 선택. 보유 여부 확인은 부르는 쪽(내 정보 아이콘 변경)에서 한다
+    public void selectIcon(String iconId) {
+        this.selectedIconId = iconId;
     }
 
     // 골드 지급 (게임 보상 등)

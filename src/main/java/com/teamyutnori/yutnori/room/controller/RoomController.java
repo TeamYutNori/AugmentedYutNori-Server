@@ -2,6 +2,7 @@ package com.teamyutnori.yutnori.room.controller;
 
 import com.teamyutnori.yutnori.room.dto.CreateRoomRequest;
 import com.teamyutnori.yutnori.room.dto.RoomSummaryResponse;
+import com.teamyutnori.yutnori.room.service.MatchmakingService;
 import com.teamyutnori.yutnori.room.service.RoomService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/rooms")
 public class RoomController {
     private final RoomService roomService;
+    private final MatchmakingService matchmakingService;
 
     // 새로운 방 생성
     @PostMapping
@@ -32,5 +34,15 @@ public class RoomController {
         RoomSummaryResponse response =
                 roomService.getRoom(code);
         return ResponseEntity.ok(response);
+    }
+
+    // 빠른 참가
+    @PostMapping("/quick-join")
+    public ResponseEntity<RoomSummaryResponse> quickJoin(
+            @Valid @RequestBody CreateRoomRequest request
+    ) {
+        return ResponseEntity.ok(
+                matchmakingService.quickJoin(request)
+        );
     }
 }
