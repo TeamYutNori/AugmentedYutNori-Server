@@ -118,13 +118,17 @@ class AutoPlayServiceTest {
         assertThat(session.isAuto(0)).isFalse();
     }
 
+    // 연결된 팀도 시간 초과면 한 단계 자동 진행 (윷 던지기)
+    // 이동할 게 생기면 같은 팀에 새 제한시간 (TURN_CHANGED 다시). 자동 진행(AutoPlay)은 돌지 않는다
     @Test
-    void 연결된_팀은_시간초과면_그냥_넘긴다() {
+    void 연결된_팀은_시간초과면_자동으로_던진다() {
+        throwsWill(YutResult.Gae);
+
         gameService.onTurnTimeout(ROOM, 0);
 
-        assertThat(sent).containsExactly(MessageType.TURN_CHANGED);
-        verifyNoInteractions(yutThrowService);
-        assertThat(session.getCurrentTeam()).isEqualTo(1);
+        assertThat(sent).containsExactly(MessageType.THROW_RESULT, MessageType.TURN_CHANGED);
+        assertThat(session.getCurrentTeam()).isZero();
+        assertThat(scheduled).isEmpty();   // AutoPlayService의 단계 예약 없음
     }
 
     @Test
