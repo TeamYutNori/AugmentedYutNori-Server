@@ -87,6 +87,11 @@ public class Player {
         this.nickname = nickname;
     }
 
+    // 프로필 아이콘 선택. 보유 여부 확인은 부르는 쪽(내 정보 아이콘 변경)에서 한다
+    public void selectIcon(String iconId) {
+        this.selectedIconId = iconId;
+    }
+
     // 골드 지급 (게임 보상 등)
     public void addGold(int amount) {
         validateGoldAmount(amount);
@@ -103,11 +108,6 @@ public class Player {
             );
         }
         this.gold -= amount;
-    }
-
-    // 프로필 아이콘 선택. 보유 여부 확인은 부르는 쪽(내 정보 아이콘 변경)에서 한다
-    public void selectIcon(String iconId) {
-        this.selectedIconId = iconId;
     }
 
     private static void validateGoldAmount(int amount) {
