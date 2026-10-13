@@ -15,7 +15,7 @@
     { "id": "gacha_100", "name": "전설의 수집가", "description": "뽑기 100회",          "stat": "GACHA_DRAWS",  "goal": 100, "rewardGold": 2000 },
 
     { "id": "first_1",   "name": "첫 승리",       "description": "1등 1번 하기",        "stat": "FIRST_PLACES", "goal": 1,   "rewardGold": 300 },
-    { "id": "first_3",   "name": "연승 가도",     "description": "1등 3번 하기",        "stat": "FIRST_PLACES", "goal": 3,   "rewardGold": 500 },
+    { "id": "first_3",   "name": "상승 가도",     "description": "1등 3번 하기",        "stat": "FIRST_PLACES", "goal": 3,   "rewardGold": 500 },
     { "id": "first_5",   "name": "윷판의 왕",     "description": "1등 5번 하기",        "stat": "FIRST_PLACES", "goal": 5,   "rewardGold": 1000 }
   ]
 }
