@@ -5,6 +5,8 @@ import com.teamyutnori.yutnori.common.NotFoundException;
 import com.teamyutnori.yutnori.player.dto.ChangeNicknameRequest;
 import com.teamyutnori.yutnori.player.dto.CreatePlayerRequest;
 import com.teamyutnori.yutnori.player.dto.CreatedPlayerResponse;
+import com.teamyutnori.yutnori.player.dto.ChangeIconRequest;
+import com.teamyutnori.yutnori.player.dto.PlayerProfileResponse;
 import com.teamyutnori.yutnori.player.entity.Player;
 import com.teamyutnori.yutnori.player.repository.PlayerRepository;
 import lombok.RequiredArgsConstructor;
@@ -71,13 +73,8 @@ public class PlayerService {
             String playerId,
             ChangeNicknameRequest request
     ) {
-
         // playerId로 현재 로그인한 플레이어 조회
-        Player player = playerRepository.findByPlayerId(playerId)
-                .orElseThrow(() -> new NotFoundException(
-                        "PLAYER_NOT_FOUND",
-                        "플레이어를 찾을 수 없습니다."
-                ));
+        Player player = getPlayerOrThrow(playerId);
 
         // 같은 닉네임을 그대로 다시 설정하는 경우는 허용
         if (request.nickname().equals(player.getNickname())) {
@@ -91,8 +88,42 @@ public class PlayerService {
                     "이미 사용 중인 닉네임입니다."
             );
         }
-
         // Player 엔티티의 닉네임 변경
         player.changeNickname(request.nickname());
+    }
+
+    // 현재 로그인한 플레이어의 프로필 조회
+    @Transactional(readOnly = true)
+    public PlayerProfileResponse getProfile(String playerId) {
+        Player player = getPlayerOrThrow(playerId);
+        return PlayerProfileResponse.from(player);
+    }
+
+    // 현재 로그인한 플레이어의 프로필 아이콘 변경
+    @Transactional
+    public void changeIcon(
+            String playerId,
+            ChangeIconRequest request
+    ) {
+        Player player = getPlayerOrThrow(playerId);
+        // TODO: 아이콘 보유 기능 연결 후 선택 가능한 아이콘인지 검증
+        // 선택한 아이콘 저장
+        player.selectIcon(request.iconId());
+    }
+
+    // ROOM_STATE 등에 사용할 현재 선택 아이콘 조회
+    @Transactional(readOnly = true)
+    public String getSelectedIconId(String playerId) {
+        return getPlayerOrThrow(playerId)
+                .getSelectedIconId();
+    }
+
+    // playerId 조회 공통 처리
+    private Player getPlayerOrThrow(String playerId) {
+        return playerRepository.findByPlayerId(playerId)
+                .orElseThrow(() -> new NotFoundException(
+                        "PLAYER_NOT_FOUND",
+                        "플레이어를 찾을 수 없습니다."
+                ));
     }
 }
