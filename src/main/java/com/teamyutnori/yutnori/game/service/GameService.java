@@ -45,6 +45,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
 
 import static com.teamyutnori.yutnori.game.exception.GameErrorCode.*;
 
@@ -78,6 +79,9 @@ public class GameService implements GameEndPort {
     private final RewardPolicy rewardPolicy;
     private final RewardService rewardService;
     private final ApplicationEventPublisher eventPublisher;
+    private final AutoMovePolicy autoMovePolicy;
+
+    private Random random = new Random();
 
     // ═══════════ 2번(RoomService) → 게임 시작 ═══════════
 
@@ -247,9 +251,28 @@ public class GameService implements GameEndPort {
                 eventPublisher.publishEvent(new AutoTurnEvent(roomCode, team));
                 return;
             }
-            turnManager.nextTurn(session);
-            broadcastTurnChanged(session);
+            timeoutStep(session, team);
         }
+    }
+
+    private void timeoutStep(GameSession session, int team) {
+        try{
+            if(session.getRemainingThrows() > 0) doThrow(session, team);
+            else{
+                Optional<AutoMovePolicy.AutoMove> move = autoMovePolicy.choose(session.getBoardState(), team, session.getStoredResults());
+                if(move.isEmpty()){
+                    forceNextTurn(session);
+                    return;
+                }
+                AutoMovePolicy.AutoMove m = move.get();
+                doMove(session, team, m.pieceId(), m.moveCount(), m.destinationNodeId(), null, true);
+            }
+        } catch (RuntimeException e){
+            log.error("[Timeout] 시간 초과 자동 처리 실패, 턴 넘김 room={} team={}", session.getRoomCode(), team, e);
+            if(session.getPhase() == GamePhase.PLAYING && session.getCurrentTeam() == team) forceNextTurn(session);
+            return;
+        }
+        if(session.getPhase() == GamePhase.PLAYING && session.getCurrentTeam() == team) resumeTurn(session);
     }
 
     // 증강 선택 제한시간 초과 → 아직 안 고른 팀은 첫 번째 후보로 자동 선택
@@ -261,8 +284,9 @@ public class GameService implements GameEndPort {
             if (session.getPhase() != GamePhase.AUGMENT_SELECT) return;
             for (int team = 0; team < session.getSetup().teamCount(); team++) {
                 if (session.hasOffer(team)) {
-                    String first = session.getOfferedAugments().get(team).get(0);
-                    confirmAugment(session, team, first, true);
+                    List<String> offered = session.getOfferedAugments().get(team);
+                    String picked = offered.get(random.nextInt(offered.size()));
+                    confirmAugment(session, team, picked, true);
                 }
             }
         }
@@ -510,5 +534,10 @@ public class GameService implements GameEndPort {
             throw new ForbiddenException(NOT_YOUR_TURN, "내 차례가 아닙니다.");
         }
         return team;
+    }
+
+    //테스트용
+    void setRandom(Random random){
+        this.random = random;
     }
 }

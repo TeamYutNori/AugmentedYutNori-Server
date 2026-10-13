@@ -87,7 +87,7 @@ class AutoPlayServiceTest {
         gameService = new GameService(repository, new TurnManager(), yutThrowService,
                 mock(AugmentDraftService.class), mock(RethrowValidator.class), broadcaster,
                 mock(GameProperties.class), mock(TurnTimerService.class), TestBoards.repository(), new CommandLog(),
-                mock(AugmentEffects.class), new RewardPolicy(), mock(RewardService.class), publisher);
+                mock(AugmentEffects.class), new RewardPolicy(), mock(RewardService.class), publisher,  new AutoMovePolicy());
 
         // 예약된 다음 단계는 큐에 모아 두고 테스트가 직접 실행한다
         TaskScheduler scheduler = mock(TaskScheduler.class);

@@ -30,6 +30,7 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -68,7 +69,7 @@ class GameServiceMoveTest {
                 mock(AugmentDraftService.class), mock(RethrowValidator.class), broadcaster,
                 mock(GameProperties.class), mock(TurnTimerService.class), TestBoards.repository(), commandLog,
                 mock(AugmentEffects.class), new RewardPolicy(), mock(RewardService.class),
-                mock(ApplicationEventPublisher.class));
+                mock(ApplicationEventPublisher.class), mock(AutoMovePolicy.class));
     }
 
     // 개(2칸)로 내 말(0번)을 2번 칸으로
@@ -188,4 +189,5 @@ class GameServiceMoveTest {
         assertThat(session.getBoardState().getPiece(0).isWaiting()).isTrue();
         assertThat(session.getStoredResults()).isEqualTo(List.of(YutResult.Gae));
     }
+
 }

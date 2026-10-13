@@ -61,7 +61,7 @@ class GameServiceRemovePlayerTest {
         service = new GameService(repository, new TurnManager(), mock(YutThrowService.class),
                 mock(AugmentDraftService.class), mock(RethrowValidator.class), broadcaster,
                 mock(GameProperties.class), mock(TurnTimerService.class), TestBoards.repository(), new CommandLog(),
-                mock(AugmentEffects.class), new RewardPolicy(), rewardService, eventPublisher);
+                mock(AugmentEffects.class), new RewardPolicy(), rewardService, eventPublisher, mock(AutoMovePolicy.class));
     }
 
     // 다른 팀이 나가면 PLAYER_REMOVED만 보내고 게임은 계속, 그 팀 말은 판에서 사라진다
