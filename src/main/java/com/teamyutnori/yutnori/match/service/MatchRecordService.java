@@ -28,15 +28,16 @@ public class MatchRecordService {
     private final Clock clock;
 
     // 끝난 게임 한 판 저장. 순위표가 비어 있으면 저장하지 않음
-    // 나감 여부: 현재 보상 규칙상 1~4등은 모두 골드를 받으므로 rewardGold 0 = 나간 플레이어
+    // 나감 여부: GameFinishedEvent.leftPlayerIds (나가기·재접속 실패로 빠진 플레이어)
     @Transactional
     public MatchResult record(GameFinishedEvent event) {
         if (event.rankings().isEmpty()) return null;
 
         MatchResult match = MatchResult.create(event.roomCode(), event.winnerTeam(), event.reason(), clock.instant());
         for (RankingEntry entry : event.rankings()) {
+            boolean left = event.leftPlayerIds().contains(entry.playerId());
             match.addParticipant(MatchParticipant.create(
-                    entry.playerId(), entry.team(), entry.rank(), entry.rewardGold(), entry.rewardGold() == 0));
+                    entry.playerId(), entry.team(), entry.rank(), entry.rewardGold(), left));
         }
         return matchResultRepository.save(match);
     }
