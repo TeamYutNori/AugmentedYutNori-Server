@@ -50,6 +50,8 @@ public class StateHashWsHandler implements WsMessageHandler {
         }
 
         int expected = connectedPlayerCount(context.roomCode(), context.playerId());
+        if (expected < 2) return;   // 연결된 사람이 나뿐이면 비교할 상대가 없음 (상대 끊김·자동 진행 중)
+
         Result result = verifier.submit(context.roomCode(), report.seq(), context.playerId(),
                 report.stateHash(), expected);
 
@@ -57,6 +59,7 @@ public class StateHashWsHandler implements WsMessageHandler {
             log.warn("상태 불일치 room={} seq={} hashes={}", result.roomCode(), result.seq(), result.hashes());
             publisher.publishEvent(new StateDesyncEvent(result.roomCode(), result.seq(), result.hashes()));
         }
+
     }
 
     // 해시를 보낼 수 있는 인원: 게임 참가자 중 나가지 않았고 지금 연결된 사람

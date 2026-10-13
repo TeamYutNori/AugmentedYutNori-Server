@@ -121,4 +121,15 @@ class StateHashWsHandlerTest {
         when(session.isRemoved(0)).thenReturn(true);
         assertThrows(ForbiddenException.class, () -> send("p0", 1, HASH_A));
     }
+    // 연결된 사람이 혼자면 비교하지 않고 넘어간다 (대기 목록에도 안 쌓임)
+    @Test
+    void alone() {
+        disconnect("p1");
+        disconnect("p2");
+
+        send("p0", 1, HASH_A);
+
+        assertEquals(0, verifier.pendingCount(ROOM));
+        verify(publisher, never()).publishEvent(any());
+    }
 }
