@@ -19,8 +19,10 @@ class IconCatalogTest {
     void 실제_json을_읽는다() {
         IconCatalog catalog = new IconCatalog(JsonMapper.builder().build());
 
-        assertThat(catalog.allIds()).containsExactly(
-                "icon_001", "icon_002", "icon_003", "icon_004", "icon_005", "icon_006");
+        // Unity Assets/Data/profile_icons.json과 같은 22개 (icon_001 ~ icon_022)
+        assertThat(catalog.allIds()).hasSize(22);
+        assertThat(catalog.allIds()).first().isEqualTo("icon_001");
+        assertThat(catalog.allIds()).last().isEqualTo("icon_022");
         assertThat(catalog.exists("icon_001")).isTrue();
         assertThat(catalog.exists("nope")).isFalse();
     }

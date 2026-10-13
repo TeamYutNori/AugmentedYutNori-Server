@@ -25,7 +25,7 @@ class GachaServiceTest {
 
     private PlayerRepository playerRepository;
     private PlayerIconRepository playerIconRepository;
-    private final IconCatalog iconCatalog = new IconCatalog(JsonMapper.builder().build());   // icon_001 ~ icon_006
+    private final IconCatalog iconCatalog = new IconCatalog(JsonMapper.builder().build());   // icon_001 ~ icon_022
     private Player player;
     private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
 
@@ -38,7 +38,7 @@ class GachaServiceTest {
         when(playerIconRepository.save(any(PlayerIcon.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
-    // 0.0이면 첫 번째(icon_001), 0.99면 마지막(icon_006)
+    // 0.0이면 첫 번째(icon_001), 0.99면 마지막(icon_022)
     private GachaService service(double roll) {
         return new GachaService(playerRepository, playerIconRepository, iconCatalog, new SequenceRandomProvider(roll),
                 eventPublisher);
@@ -71,12 +71,12 @@ class GachaServiceTest {
     @Test
     void 가진_아이콘이_또_나오면_count만_올리고_보상은_없다() {
         player.addGold(200);
-        PlayerIcon owned = PlayerIcon.first("p1", "icon_006");
-        when(playerIconRepository.findByPlayerIdAndIconId("p1", "icon_006")).thenReturn(Optional.of(owned));
+        PlayerIcon owned = PlayerIcon.first("p1", "icon_022");
+        when(playerIconRepository.findByPlayerIdAndIconId("p1", "icon_022")).thenReturn(Optional.of(owned));
 
         GachaResultResponse result = service(0.99).draw("p1");
 
-        assertThat(result.iconId()).isEqualTo("icon_006");
+        assertThat(result.iconId()).isEqualTo("icon_022");
         assertThat(result.duplicate()).isTrue();
         assertThat(result.count()).isEqualTo(2);
         assertThat(result.gold()).isZero();
