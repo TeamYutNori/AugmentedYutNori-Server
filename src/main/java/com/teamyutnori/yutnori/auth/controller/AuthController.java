@@ -1,6 +1,7 @@
 package com.teamyutnori.yutnori.auth.controller;
 
 import com.teamyutnori.yutnori.auth.FirebaseTokenVerifier;
+import com.teamyutnori.yutnori.auth.PlayerLoggedInEvent;
 import com.teamyutnori.yutnori.auth.TokenProvider;
 import com.teamyutnori.yutnori.auth.dto.FirebaseLoginRequest;
 import com.teamyutnori.yutnori.auth.dto.LoginResponse;
@@ -8,6 +9,7 @@ import com.teamyutnori.yutnori.player.entity.Player;
 import com.teamyutnori.yutnori.player.service.PlayerService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -18,6 +20,7 @@ public class AuthController {
     private final FirebaseTokenVerifier firebaseTokenVerifier;
     private final PlayerService playerService;
     private final TokenProvider tokenProvider;
+    private final ApplicationEventPublisher eventPublisher;
 
     @PostMapping("/firebase")
     public LoginResponse firebaseLogin(
@@ -39,7 +42,10 @@ public class AuthController {
                 player.getPlayerId()
         );
 
-        // 4. 로그인 결과 반환
+        // 4. 업적(접속 횟수)용 로그인 알림. 같은 날 여러 번 로그인해도 1번만 센다
+        eventPublisher.publishEvent(new PlayerLoggedInEvent(player.getPlayerId()));
+
+        // 5. 로그인 결과 반환
         return new LoginResponse(
                 player.getPlayerId(),
                 player.getNickname(),

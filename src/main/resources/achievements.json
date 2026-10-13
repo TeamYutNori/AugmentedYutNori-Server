@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "achievements": [
+    { "id": "login_1",   "name": "첫 접속",       "description": "1일 접속하기",        "stat": "LOGIN_DAYS",   "goal": 1,   "rewardGold": 100 },
+    { "id": "login_5",   "name": "단골 손님",     "description": "5일 접속하기",        "stat": "LOGIN_DAYS",   "goal": 5,   "rewardGold": 300 },
+    { "id": "login_10",  "name": "윷놀이 마니아", "description": "10일 접속하기",       "stat": "LOGIN_DAYS",   "goal": 10,  "rewardGold": 500 },
+
+    { "id": "games_1",   "name": "첫 판",         "description": "게임 1판 끝까지 하기", "stat": "GAMES_PLAYED", "goal": 1,   "rewardGold": 100 },
+    { "id": "games_5",   "name": "몸풀기 끝",     "description": "게임 5판 끝까지 하기", "stat": "GAMES_PLAYED", "goal": 5,   "rewardGold": 300 },
+    { "id": "games_10",  "name": "베테랑",        "description": "게임 10판 끝까지 하기","stat": "GAMES_PLAYED", "goal": 10,  "rewardGold": 500 },
+
+    { "id": "gacha_10",  "name": "수집 시작",     "description": "뽑기 10회",           "stat": "GACHA_DRAWS",  "goal": 10,  "rewardGold": 300 },
+    { "id": "gacha_20",  "name": "수집가",        "description": "뽑기 20회",           "stat": "GACHA_DRAWS",  "goal": 20,  "rewardGold": 500 },
+    { "id": "gacha_50",  "name": "열정 수집가",   "description": "뽑기 50회",           "stat": "GACHA_DRAWS",  "goal": 50,  "rewardGold": 1000 },
+    { "id": "gacha_100", "name": "전설의 수집가", "description": "뽑기 100회",          "stat": "GACHA_DRAWS",  "goal": 100, "rewardGold": 2000 },
+
+    { "id": "first_1",   "name": "첫 승리",       "description": "1등 1번 하기",        "stat": "FIRST_PLACES", "goal": 1,   "rewardGold": 300 },
+    { "id": "first_3",   "name": "상승 가도",     "description": "1등 3번 하기",        "stat": "FIRST_PLACES", "goal": 3,   "rewardGold": 500 },
+    { "id": "first_5",   "name": "윷판의 왕",     "description": "1등 5번 하기",        "stat": "FIRST_PLACES", "goal": 5,   "rewardGold": 1000 }
+  ]
+}
