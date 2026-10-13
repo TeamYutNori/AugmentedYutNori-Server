@@ -42,9 +42,11 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.teamyutnori.yutnori.game.exception.GameErrorCode.*;
 
@@ -459,7 +461,11 @@ public class GameService implements GameEndPort {
 
         broadcaster.broadcast(session.getRoomCode(), MessageType.GAME_ENDED,
                 new GameEndedMessage(winnerTeam, reason, rankings));
-        eventPublisher.publishEvent(new GameFinishedEvent(session.getRoomCode(), winnerTeam, reason, rankings));
+        Set<String> leftPlayerIds = new HashSet<>();
+        session.getPlayerTeams().forEach((playerId, team) -> {
+            if (session.isRemoved(team)) leftPlayerIds.add(playerId);
+        });
+        eventPublisher.publishEvent(new GameFinishedEvent(session.getRoomCode(), winnerTeam, reason, rankings, leftPlayerIds));
     }
 
     // 새 턴 알림 + 턴 타이머 시작 (start는 이전 타이머를 취소하고 새로 건다)

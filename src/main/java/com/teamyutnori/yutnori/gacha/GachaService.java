@@ -10,6 +10,7 @@ import com.teamyutnori.yutnori.icon.PlayerIconRepository;
 import com.teamyutnori.yutnori.player.entity.Player;
 import com.teamyutnori.yutnori.player.repository.PlayerRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +28,7 @@ public class GachaService {
     private final PlayerIconRepository playerIconRepository;
     private final IconCatalog iconCatalog;
     private final RandomProvider randomProvider;
+    private final ApplicationEventPublisher eventPublisher;
 
     // 골드 차감 → 뽑기 → 보유 목록 반영. 한 트랜잭션이라 중간에 실패하면 골드도 그대로다
     @Transactional
@@ -43,6 +45,9 @@ public class GachaService {
         } else {
             owned = playerIconRepository.save(PlayerIcon.first(playerId, picked.id()));
         }
+
+        // 업적(뽑기 횟수)용. 이 트랜잭션이 커밋된 뒤에 집계된다
+        eventPublisher.publishEvent(new GachaDrawnEvent(playerId, picked.id()));
 
         return new GachaResultResponse(picked.id(), duplicate, owned.getCount(), player.getGold(), PRICE);
     }

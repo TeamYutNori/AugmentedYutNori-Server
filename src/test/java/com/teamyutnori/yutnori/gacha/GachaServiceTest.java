@@ -11,6 +11,7 @@ import com.teamyutnori.yutnori.player.entity.Player;
 import com.teamyutnori.yutnori.player.repository.PlayerRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.Optional;
@@ -26,6 +27,7 @@ class GachaServiceTest {
     private PlayerIconRepository playerIconRepository;
     private final IconCatalog iconCatalog = new IconCatalog(JsonMapper.builder().build());   // icon_001 ~ icon_006
     private Player player;
+    private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
 
     @BeforeEach
     void setUp() {
@@ -38,7 +40,8 @@ class GachaServiceTest {
 
     // 0.0이면 첫 번째(icon_001), 0.99면 마지막(icon_006)
     private GachaService service(double roll) {
-        return new GachaService(playerRepository, playerIconRepository, iconCatalog, new SequenceRandomProvider(roll));
+        return new GachaService(playerRepository, playerIconRepository, iconCatalog, new SequenceRandomProvider(roll),
+                eventPublisher);
     }
 
     @Test
@@ -54,6 +57,15 @@ class GachaServiceTest {
         assertThat(result.price()).isEqualTo(GachaService.PRICE);
         assertThat(player.getGold()).isEqualTo(300);
         verify(playerIconRepository).save(any(PlayerIcon.class));
+    }
+
+    @Test
+    void 뽑으면_업적용_뽑기_이벤트를_발행한다() {
+        player.addGold(500);
+
+        service(0.0).draw("p1");
+
+        verify(eventPublisher).publishEvent(new GachaDrawnEvent("p1", "icon_001"));
     }
 
     @Test
