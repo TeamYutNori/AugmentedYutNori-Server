@@ -541,4 +541,8 @@ public class GameService implements GameEndPort {
         }
         return team;
     }
+
+    void setRandom(Random random) {
+        this.random = random;
+    }
 }
