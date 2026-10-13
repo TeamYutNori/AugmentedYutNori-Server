@@ -5,6 +5,7 @@ import com.teamyutnori.yutnori.game.service.GameFinishedEvent;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
@@ -13,7 +14,7 @@ import static org.mockito.Mockito.*;
 class MatchRecordListenerTest {
 
     private final GameFinishedEvent event =
-            new GameFinishedEvent("ROOM1", 0, GameEndReason.FINISHED, List.of());
+            new GameFinishedEvent("ROOM1", 0, GameEndReason.FINISHED, List.of(), Set.of());
 
     // 게임이 끝나면 전적 저장을 부른다
     @Test

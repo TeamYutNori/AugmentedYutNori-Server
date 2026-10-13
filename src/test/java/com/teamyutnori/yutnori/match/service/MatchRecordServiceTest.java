@@ -15,6 +15,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,7 +45,8 @@ class MatchRecordServiceTest {
         GameFinishedEvent event = new GameFinishedEvent("ROOM1", 0, GameEndReason.FINISHED, List.of(
                 new RankingEntry("p0", 0, 1, 500),
                 new RankingEntry("p1", 1, 2, 400),
-                new RankingEntry("p2", 2, 3, 0)));
+                new RankingEntry("p2", 2, 3, 0)),
+                Set.of("p2"));
 
         MatchResult saved = service.record(event);
 
@@ -60,7 +62,7 @@ class MatchRecordServiceTest {
     // 순위표가 비어 있으면 저장하지 않는다
     @Test
     void emptyRankings() {
-        service.record(new GameFinishedEvent("ROOM1", -1, GameEndReason.DISCONNECTED, List.of()));
+        service.record(new GameFinishedEvent("ROOM1", -1, GameEndReason.DISCONNECTED, List.of(), Set.of()));
 
         verifyNoInteractions(matchResultRepository);
     }
