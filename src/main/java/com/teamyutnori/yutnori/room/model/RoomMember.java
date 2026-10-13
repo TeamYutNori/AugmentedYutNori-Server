@@ -8,6 +8,8 @@ public class RoomMember {
     private final String playerId;
     // 계정에 저장된 플레이어 닉네임
     private final String nickname;
+    // 방 참가자의 프로필 아이콘 id
+    private final String iconId;
     // 플레이어가 속한 팀
     private int team;
     // 게임 시작 준비 여부
@@ -15,13 +17,13 @@ public class RoomMember {
 
     public RoomMember(
             String playerId,
-            String nickname
+            String nickname,
+            String iconId
     ) {
         this.playerId = playerId;
         this.nickname = nickname;
-        // 방 입장 직후에는 팀이 정해지지 않은 상태
+        this.iconId = iconId;
         this.team = 0;
-        // 방 입장 직후에는 준비되지 않은 상태
         this.ready = false;
     }
 

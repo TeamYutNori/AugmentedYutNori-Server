@@ -58,7 +58,7 @@ public final class WsMessages {
 
     // ROOM_STATE 메시지 안에서 사용하는 참가자 한 명의 정보
     // 클라이언트가 방에 누가 들어와 있는지, 어떤 팀인지, 준비 상태가 어떤지를 화면에 표시할 때 사용
-    public record RoomMemberMessage(String playerId, String nickname, int team, boolean ready) {
+    public record RoomMemberMessage(String playerId, String nickname, String iconId, int team, boolean ready) {
 
         // Room 도메인 객체의 참가자 정보를
         // 클라이언트에게 전달할 WebSocket 응답 형태로 변환
@@ -66,6 +66,7 @@ public final class WsMessages {
             return new RoomMemberMessage(
                     member.getPlayerId(),
                     member.getNickname(),
+                    member.getIconId(),
                     member.getTeam(),
                     member.isReady()
             );

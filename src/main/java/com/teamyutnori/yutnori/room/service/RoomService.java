@@ -46,7 +46,8 @@ public class RoomService {
     public Room joinRoom(
             String roomCode,
             String playerId,
-            String nickname
+            String nickname,
+            String iconId
     ) {
         Room room = getRoomOrThrow(roomCode);
         // 같은 방에 여러 요청이 동시에 들어와도 참가자 상태가 꼬이지 않도록 동기화
@@ -74,7 +75,8 @@ public class RoomService {
 
             RoomMember member = new RoomMember(
                     playerId,
-                    nickname
+                    nickname,
+                    iconId
             );
 
             // 현재는 입장 순서 기준으로 팀 번호를 임시 배정
