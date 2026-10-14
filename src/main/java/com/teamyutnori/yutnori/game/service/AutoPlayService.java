@@ -146,7 +146,7 @@ public class AutoPlayService {
     // 던질 게 남았으면 던지기, 아니면 정책으로 고른 이동
     private void act(GameSession session, int team) {
         if (session.getRemainingThrows() > 0) {
-            gameService.doThrow(session, team);
+            gameService.doThrow(session, team, false);   // 자동 진행은 야바위꾼을 쓰지 않으므로 기다리지 않음
             return;
         }
 

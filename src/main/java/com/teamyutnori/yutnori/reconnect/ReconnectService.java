@@ -2,6 +2,7 @@ package com.teamyutnori.yutnori.reconnect;
 
 import com.teamyutnori.yutnori.game.board.BoardState;
 import com.teamyutnori.yutnori.game.board.Piece;
+import com.teamyutnori.yutnori.game.model.GamePhase;
 import com.teamyutnori.yutnori.game.model.GameSession;
 import com.teamyutnori.yutnori.game.repository.GameSessionRepository;
 import com.teamyutnori.yutnori.game.service.StateDesyncEvent;
@@ -31,7 +32,9 @@ public class ReconnectService {
     private final RoomBroadcaster broadcaster;
     private final TurnTimerService turnTimerService;
     private final SequenceTracker sequenceTracker;
-    
+
+    public enum SnapshotResult { SENT, GAME_NOT_FOUND, NOT_IN_GAME, REMOVED, GAME_ENDED }
+
     @EventListener
     public void onReconnected(PlayerReconnectedEvent event){
         sendSnapshot(event.roomCode(), event.playerId());
@@ -47,20 +50,22 @@ public class ReconnectService {
         });
     }
     
-    public boolean sendSnapshot(String roomCode, String playerId){
+    public SnapshotResult sendSnapshot(String roomCode, String playerId){
         Optional<GameSession> found = sessionRepository.find(roomCode);
-        if(found.isEmpty()) return false;
+        if(found.isEmpty()) return SnapshotResult.GAME_NOT_FOUND;
         GameSession session = found.get();
 
         GameSnapshotMessage snapshot;
         synchronized (session){
             Optional<Integer> myTeam = session.teamOf(playerId);
-            if(myTeam.isEmpty()) return false;
+            if(myTeam.isEmpty()) return SnapshotResult.NOT_IN_GAME;
+            if(session.isRemoved(myTeam.get())) return SnapshotResult.REMOVED;
+            if(session.getPhase() == GamePhase.ENDED) return SnapshotResult.GAME_ENDED;
             snapshot = buildSnapshot(roomCode, session, myTeam.get());
         }
         
         broadcaster.sendTo(roomCode, playerId, MessageType.GAME_SNAPSHOT, snapshot);
-        return true;
+        return SnapshotResult.SENT;
     }
 
     private GameSnapshotMessage buildSnapshot(String roomCode, GameSession session, Integer myTeam) {
