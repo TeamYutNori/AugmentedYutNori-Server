@@ -42,6 +42,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -84,6 +85,7 @@ public class GameService implements GameEndPort {
     private final AutoMovePolicy autoMovePolicy;
 
     private Random random = new Random();
+    static final Duration TIMEOUT_STEP_DELAY = Duration.ofMillis(800);
 
     // ═══════════ 2번(RoomService) → 게임 시작 ═══════════
 
@@ -257,6 +259,8 @@ public class GameService implements GameEndPort {
         }
     }
 
+    // 시간 초과된 연결 팀의 한 단계. 호출하는 쪽이 synchronized (session) 안에서 부른다
+    // 턴이 이어지면 TIMEOUT_STEP_DELAY 뒤 다시 시간 초과가 울려 다음 단계 → 턴이 넘어갈 때까지 반복
     private void timeoutStep(GameSession session, int team) {
         try{
             if(session.getRemainingThrows() > 0) doThrow(session, team);
@@ -274,7 +278,11 @@ public class GameService implements GameEndPort {
             if(session.getPhase() == GamePhase.PLAYING && session.getCurrentTeam() == team) forceNextTurn(session);
             return;
         }
-        if(session.getPhase() == GamePhase.PLAYING && session.getCurrentTeam() == team) resumeTurn(session);
+        // 같은 팀 턴이 이어지면 (윷·모·잡기로 한 번 더, 이동할 결과 남았을 때)
+        // 30초를 새로 주지 않고 짧은 간격 뒤 다음 단계를 자동으로 → 턴이 넘어갈 때까지 이어서 진행
+        if (session.getPhase() == GamePhase.PLAYING && session.getCurrentTeam() == team) {
+            turnTimerService.start(session.getRoomCode(), team, TimerType.TURN, TIMEOUT_STEP_DELAY);
+        }
     }
 
     // 증강 선택 제한시간 초과 → 아직 안 고른 팀은 첫 번째 후보로 자동 선택
