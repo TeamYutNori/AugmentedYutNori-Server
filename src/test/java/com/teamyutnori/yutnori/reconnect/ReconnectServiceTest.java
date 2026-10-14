@@ -130,20 +130,46 @@ class ReconnectServiceTest {
         verify(broadcaster).sendTo(eq(ROOM), eq("p1"), eq(MessageType.GAME_SNAPSHOT), any());
     }
 
-    // 게임이 없는 방이면 보내지 않고 false
+    // 게임이 없으면 GAME_NOT_FOUND
     @Test
     void noGame() {
-        when(repository.find("LOBBY")).thenReturn(Optional.empty());
-
-        assertThat(service.sendSnapshot("LOBBY", "p0")).isFalse();
-        verifyNoInteractions(broadcaster);
+        when(repository.find(ROOM)).thenReturn(Optional.empty());
+        assertThat(service.sendSnapshot(ROOM, "p0")).isEqualTo(ReconnectService.SnapshotResult.GAME_NOT_FOUND);
+        verify(broadcaster, never()).sendTo(any(), any(), any(), any());
     }
 
-    // 게임 참가자가 아니면 보내지 않고 false
+    // 참가자가 아니면 NOT_IN_GAME
     @Test
     void notInGame() {
-        assertThat(service.sendSnapshot(ROOM, "ghost")).isFalse();
-        verifyNoInteractions(broadcaster);
+        assertThat(service.sendSnapshot(ROOM, "stranger")).isEqualTo(ReconnectService.SnapshotResult.NOT_IN_GAME);
+        verify(broadcaster, never()).sendTo(any(), any(), any(), any());
+    }
+
+    // 나가기·재접속 실패로 제외된 플레이어는 복귀 불가 (스냅샷 안 보냄)
+    @Test
+    void removed() {
+        session.markRemoved(0);
+
+        assertThat(service.sendSnapshot(ROOM, "p0")).isEqualTo(ReconnectService.SnapshotResult.REMOVED);
+        verify(broadcaster, never()).sendTo(any(), any(), any(), any());
+    }
+
+    // 끝난 경기는 복귀 불가
+    @Test
+    void ended() {
+        session.setPhase(GamePhase.ENDED);
+
+        assertThat(service.sendSnapshot(ROOM, "p0")).isEqualTo(ReconnectService.SnapshotResult.GAME_ENDED);
+        verify(broadcaster, never()).sendTo(any(), any(), any(), any());
+    }
+
+    // 제외된 사람과 끝난 게임이 겹치면 "제외됨"으로 알려 준다 (끊겨서 빠지는 바람에 게임이 끝난 경우)
+    @Test
+    void removedAndEnded() {
+        session.markRemoved(0);
+        session.setPhase(GamePhase.ENDED);
+
+        assertThat(service.sendSnapshot(ROOM, "p0")).isEqualTo(ReconnectService.SnapshotResult.REMOVED);
     }
     // 이동 전: 모든 말이 대기석, id 순서로 담긴다
     @Test
