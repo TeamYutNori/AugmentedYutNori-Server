@@ -126,7 +126,7 @@ class AutoPlayServiceTest {
 
         gameService.onTurnTimeout(ROOM, 0);
 
-        assertThat(sent).containsExactly(MessageType.THROW_RESULT, MessageType.TURN_CHANGED);
+        assertThat(sent).containsExactly(MessageType.THROW_RESULT);   // 같은 턴 TURN_CHANGED 재전송 없음
         assertThat(session.getCurrentTeam()).isZero();
         assertThat(scheduled).isEmpty();   // AutoPlayService의 단계 예약 없음
     }

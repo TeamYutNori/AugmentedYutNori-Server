@@ -1,9 +1,6 @@
 package com.teamyutnori.yutnori.ws.handler;
 
-import com.teamyutnori.yutnori.common.ForbiddenException;
-import com.teamyutnori.yutnori.common.InvalidRequestException;
-import com.teamyutnori.yutnori.common.NotFoundException;
-import com.teamyutnori.yutnori.game.exception.GameErrorCode;
+import com.teamyutnori.yutnori.game.model.GamePhase;
 import com.teamyutnori.yutnori.game.model.GameSession;
 import com.teamyutnori.yutnori.game.repository.GameSessionRepository;
 import com.teamyutnori.yutnori.game.service.StateDesyncEvent;
@@ -22,6 +19,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.Map;
+import java.util.Optional;
 
 // STATE_HASH: MOVE_APPLIED 적용 후 각 클라가 보낸 상태 해시를 모아 비교한다
 // 기다리는 인원 = 게임에서 나가지 않았고 지금 WebSocket이 연결된 플레이어
@@ -45,12 +43,10 @@ public class StateHashWsHandler implements WsMessageHandler {
     @Override
     public void handle(WsMessageContext context, JsonNode payload) {
         StateHashReport report = objectMapper.treeToValue(payload, StateHashReport.class);
-        if (report.seq() <= 0) {
-            throw new InvalidRequestException("INVALID_SEQ", "seq는 1 이상이어야 합니다.");
-        }
+        if (report.seq() <= 0) return;   // 잘못된 seq는 비교하지 않고 무시 (확인용 메시지라 에러를 보내지 않음)
 
         int expected = connectedPlayerCount(context.roomCode(), context.playerId());
-        if (expected < 2) return;   // 연결된 사람이 나뿐이면 비교할 상대가 없음 (상대 끊김·자동 진행 중)
+        if (expected < 2) return;   // 게임 없음·참가자 아님·혼자 연결됨 → 비교할 상대가 없음
 
         Result result = verifier.submit(context.roomCode(), report.seq(), context.playerId(),
                 report.stateHash(), expected);
@@ -59,20 +55,22 @@ public class StateHashWsHandler implements WsMessageHandler {
             log.warn("상태 불일치 room={} seq={} hashes={}", result.roomCode(), result.seq(), result.hashes());
             publisher.publishEvent(new StateDesyncEvent(result.roomCode(), result.seq(), result.hashes()));
         }
-
     }
 
     // 해시를 보낼 수 있는 인원: 게임 참가자 중 나가지 않았고 지금 연결된 사람
-    // 게임이 없거나, 보낸 사람이 참가자가 아니거나, 이미 나간 사람이면 거부
+    // 비교할 수 없는 경우는 0을 돌려준다 (예외 대신):
+    //  - 게임 세션 없음 (게임 종료 직후 세션이 정리된 뒤 늦게 온 해시 등)
+    //  - 보낸 사람이 참가자가 아니거나 이미 게임에서 빠짐
     private int connectedPlayerCount(String roomCode, String playerId) {
-        GameSession session = sessionRepository.find(roomCode)
-                .orElseThrow(() -> new NotFoundException(GameErrorCode.GAME_NOT_FOUND, "진행 중인 게임이 없습니다: " + roomCode));
+        Optional<GameSession> found = sessionRepository.find(roomCode);
+        if (found.isEmpty()) return 0;
+        GameSession session = found.get();
 
         synchronized (session) {
+            if (session.getPhase() == GamePhase.ENDED) return 0;
+
             Integer senderTeam = session.getPlayerTeams().get(playerId);
-            if (senderTeam == null || session.isRemoved(senderTeam)) {
-                throw new ForbiddenException(GameErrorCode.PLAYER_NOT_IN_GAME, "게임에 참가 중인 플레이어가 아닙니다.");
-            }
+            if (senderTeam == null || session.isRemoved(senderTeam)) return 0;
 
             int count = 0;
             for (Map.Entry<String, Integer> entry : session.getPlayerTeams().entrySet()) {
@@ -80,7 +78,7 @@ public class StateHashWsHandler implements WsMessageHandler {
                 boolean connected = registry.find(roomCode, entry.getKey()).isPresent();
                 if (!removed && connected) count++;
             }
-            return Math.max(count, 1);   // 보낸 사람은 연결돼 있으므로 최소 1
+            return count;
         }
     }
 }

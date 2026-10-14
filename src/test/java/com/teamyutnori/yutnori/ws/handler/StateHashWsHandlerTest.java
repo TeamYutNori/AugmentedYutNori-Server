@@ -2,6 +2,7 @@ package com.teamyutnori.yutnori.ws.handler;
 
 import com.teamyutnori.yutnori.common.ForbiddenException;
 import com.teamyutnori.yutnori.common.NotFoundException;
+import com.teamyutnori.yutnori.game.model.GamePhase;
 import com.teamyutnori.yutnori.game.model.GameSession;
 import com.teamyutnori.yutnori.game.repository.GameSessionRepository;
 import com.teamyutnori.yutnori.game.service.StateDesyncEvent;
@@ -50,6 +51,7 @@ class StateHashWsHandlerTest {
         when(session.isRemoved(anyInt())).thenReturn(false);
         when(repository.find(ROOM)).thenReturn(Optional.of(session));
         when(registry.find(eq(ROOM), any())).thenReturn(Optional.of(mock(WebSocketSession.class)));
+        when(session.getPhase()).thenReturn(GamePhase.PLAYING);
     }
 
     private void disconnect(String playerId) {
@@ -106,20 +108,40 @@ class StateHashWsHandlerTest {
         verify(publisher).publishEvent(any(StateDesyncEvent.class));
     }
 
-    // 게임이 없으면 GAME_NOT_FOUND
+    // 게임이 없으면 (게임 종료 직후 세션 정리 등) 에러 없이 무시
     @Test
     void noGame() {
         when(repository.find(ROOM)).thenReturn(Optional.empty());
-        assertThrows(NotFoundException.class, () -> send("p0", 1, HASH_A));
+
+        assertDoesNotThrow(() -> send("p0", 1, HASH_A));
+        assertEquals(0, verifier.pendingCount(ROOM));
     }
 
-    // 참가자가 아니거나 이미 나간 사람이면 거부
+    // 끝난 게임이면 무시
+    @Test
+    void ended() {
+        when(session.getPhase()).thenReturn(GamePhase.ENDED);
+
+        assertDoesNotThrow(() -> send("p0", 1, HASH_A));
+        assertEquals(0, verifier.pendingCount(ROOM));
+    }
+
+    // 참가자가 아니거나 이미 나간 사람이면 무시
     @Test
     void notInGame() {
-        assertThrows(ForbiddenException.class, () -> send("stranger", 1, HASH_A));
+        assertDoesNotThrow(() -> send("stranger", 1, HASH_A));
 
         when(session.isRemoved(0)).thenReturn(true);
-        assertThrows(ForbiddenException.class, () -> send("p0", 1, HASH_A));
+        assertDoesNotThrow(() -> send("p0", 1, HASH_A));
+
+        assertEquals(0, verifier.pendingCount(ROOM));
+    }
+
+    // seq가 0 이하면 무시
+    @Test
+    void invalidSeq() {
+        assertDoesNotThrow(() -> send("p0", 0, HASH_A));
+        assertEquals(0, verifier.pendingCount(ROOM));
     }
     // 연결된 사람이 혼자면 비교하지 않고 넘어간다 (대기 목록에도 안 쌓임)
     @Test
