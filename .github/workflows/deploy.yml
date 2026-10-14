@@ -1,0 +1,52 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-ec2
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build jar
+        run: |
+          chmod +x gradlew
+          ./gradlew bootJar
+          cp $(ls build/libs/*.jar | grep -v plain) app.jar
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+
+      - name: Upload jar to S3
+        run: aws s3 cp app.jar s3://${{ secrets.S3_BUCKET }}/app-${{ github.sha }}.jar
+
+      - name: Deploy via SSM
+        run: |
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --document-name AWS-RunShellScript \
+            --parameters 'commands=[
+              "aws s3 cp s3://${{ secrets.S3_BUCKET }}/app-${{ github.sha }}.jar /opt/yutnori/app.jar.new",
+              "cp /opt/yutnori/app.jar /opt/yutnori/app.jar.bak",
+              "mv /opt/yutnori/app.jar.new /opt/yutnori/app.jar",
+              "systemctl restart yutnori"
+            ]' \
+            --query Command.CommandId --output text)
+          aws ssm wait command-executed --command-id $CMD_ID --instance-id ${{ secrets.EC2_INSTANCE_ID }}
