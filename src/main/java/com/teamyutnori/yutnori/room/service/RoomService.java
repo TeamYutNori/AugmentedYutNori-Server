@@ -25,6 +25,7 @@ public class RoomService {
     // 새로운 방을 생성하고 메모리 저장소에 등록
     public RoomSummaryResponse createRoom(CreateRoomRequest request) {
         Room room;
+
         // 혹시 같은 방 코드가 생성되면 충돌하지 않도록 다시 생성
         do {
             String roomCode = createRoomCode();
@@ -82,8 +83,8 @@ public class RoomService {
                     iconId
             );
 
-            // 현재는 입장 순서 기준으로 팀 번호를 임시 배정
-            member.assignTeam(room.getCurrentPlayers());
+            // 현재 아무도 사용하지 않는 가장 작은 팀 번호를 배정
+            member.assignTeam(findAvailableTeam(room));
             // 검증이 모두 끝난 뒤 실제 참가자 목록에 추가
             room.addMember(member);
             return room;
@@ -160,6 +161,7 @@ public class RoomService {
                 );
             }
             room.removeMember(playerId);
+
             // 마지막 플레이어가 나가면 빈 방은 저장소에서 제거
             if (room.getCurrentPlayers() == 0) {
                 roomRepository.delete(roomCode);
@@ -176,6 +178,27 @@ public class RoomService {
             room.resetForRematch();
             return room;
         }
+    }
+
+    // 현재 아무도 사용하지 않는 가장 작은 팀 번호를 찾음
+    private int findAvailableTeam(Room room) {
+        for (int team = 0; team < room.getMaxPlayers(); team++) {
+            final int candidate = team;
+            boolean alreadyUsed = room.getMembers()
+                    .stream()
+                    .anyMatch(member -> member.getTeam() == candidate);
+
+            // 아무도 사용하지 않는 팀 번호를 찾으면 바로 반환
+            if (!alreadyUsed) {
+                return candidate;
+            }
+        }
+
+        // 정상적으로는 room.isFull()에서 먼저 막히기 때문에 발생하지 않음
+        throw new ConflictException(
+                "NO_AVAILABLE_TEAM",
+                "배정 가능한 팀이 없습니다."
+        );
     }
 
     // 방 조회 로직을 한 곳에서 처리
