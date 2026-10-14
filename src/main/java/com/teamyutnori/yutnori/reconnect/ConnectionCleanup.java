@@ -62,6 +62,15 @@ public class ConnectionCleanup {
             return;
         }
 
+        if(isInLobby(roomCode)){
+            synchronized (this) {
+                cancelInternal(new Key(roomCode, playerId));
+            }
+            log.info("대기방에서 끊김, 유예 없이 퇴장 처리 room={}, player={}", roomCode, playerId);
+            publisher.publishEvent(new DisconnectTimeoutEvent(roomCode, playerId));
+            return;
+        }
+
         Key key = new Key(roomCode, playerId);
         synchronized (this){
             cancelInternal(key);
@@ -126,5 +135,9 @@ public class ConnectionCleanup {
 
     private boolean hasLeftGame(String roomCode, String playerId){
         return gameEndPort.map(game -> game.hasLeftGame(roomCode, playerId)).orElse(false);
+    }
+
+    private boolean isInLobby(String roomCode){
+        return gameEndPort.map(game -> !game.isPlaying(roomCode)).orElse(false);
     }
 }

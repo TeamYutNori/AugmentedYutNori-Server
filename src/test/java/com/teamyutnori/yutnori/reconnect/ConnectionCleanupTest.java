@@ -207,4 +207,43 @@ class ConnectionCleanupTest {
         verify(broadcaster, never()).broadcast(any(), eq(MessageType.PLAYER_DISCONNECTED), any());
         assertThat(count(PlayerDisconnectedEvent.class)).isZero();
     }
+
+    // 대기방(게임 진행 중 아님)에서 끊기면 유예 없이 바로 DisconnectTimeoutEvent (결과 화면에서 강제 종료 포함)
+    @Test
+    void lobbyDisconnect() {
+        ConnectionCleanup lobby = cleanupWith(playing(false));
+
+        lobby.onDisconnected(p1);
+
+        assertThat(count(DisconnectTimeoutEvent.class)).isEqualTo(1);
+        assertThat(first(DisconnectTimeoutEvent.class).playerId()).isEqualTo("p1");
+        assertThat(count(PlayerDisconnectedEvent.class)).isZero();
+        assertThat(lobby.isWaiting(ROOM, "p1")).isFalse();
+        verify(broadcaster, never()).broadcast(any(), eq(MessageType.PLAYER_DISCONNECTED), any());
+    }
+
+    // 게임 진행 중이면 기존대로 유예 대기
+    @Test
+    void gameDisconnect() {
+        ConnectionCleanup game = cleanupWith(playing(true));
+
+        game.onDisconnected(p1);
+
+        assertThat(game.isWaiting(ROOM, "p1")).isTrue();
+        assertThat(count(DisconnectTimeoutEvent.class)).isZero();
+        verify(broadcaster).broadcast(eq(ROOM), eq(MessageType.PLAYER_DISCONNECTED), any());
+    }
+
+    private ConnectionCleanup cleanupWith(GameEndPort port) {
+        return new ConnectionCleanup(broadcaster, registry, properties,
+                scheduler, Clock.systemUTC(), events::add, Optional.of(port));
+    }
+
+    private GameEndPort playing(boolean playing) {
+        return new GameEndPort() {
+            public boolean isPlaying(String roomCode) { return playing; }
+            public Optional<Integer> findTeam(String roomCode, String playerId) { return Optional.of(0); }
+            public void endGame(String roomCode, int winnerTeam) {}
+        };
+    }
 }
