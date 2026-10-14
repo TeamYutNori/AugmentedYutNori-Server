@@ -162,7 +162,7 @@ public class GameService implements GameEndPort {
             if (session.getRemainingThrows() <= 0) {
                 throw new InvalidRequestException(NO_THROWS_LEFT, "남은 던지기 횟수가 없습니다.");
             }
-            doThrow(session, team);
+            doThrow(session, team, true);
         }
     }
 
@@ -263,7 +263,7 @@ public class GameService implements GameEndPort {
     // 턴이 이어지면 TIMEOUT_STEP_DELAY 뒤 다시 시간 초과가 울려 다음 단계 → 턴이 넘어갈 때까지 반복
     private void timeoutStep(GameSession session, int team) {
         try{
-            if(session.getRemainingThrows() > 0) doThrow(session, team);
+            if(session.getRemainingThrows() > 0) doThrow(session, team, false);
             else{
                 Optional<AutoMovePolicy.AutoMove> move = autoMovePolicy.choose(session.getBoardState(), team, session.getStoredResults());
                 if(move.isEmpty()){
@@ -364,13 +364,19 @@ public class GameService implements GameEndPort {
     // 같은 코드를 타므로 증강 규칙(도박사·사냥꾼·이동 증강)이 사람과 자동 진행에 똑같이 적용된다
 
     // 던지기 → THROW_RESULT → 할 게 없으면 다음 팀
-    void doThrow(GameSession session, int team) {
+    // waitForRethrow: 플레이어가 직접 던졌으면 true. 할 게 없어도 야바위꾼(다시 던지기)을 쓸 수 있으면 턴을 넘기지 않고 기다린다
+    //                 (다시 던지기 / PASS_TURN / 시간 초과 중 하나로 이어진다)
+    //                 시간 초과·자동 진행으로 던졌으면 false → 지금처럼 바로 다음 팀
+    void doThrow(GameSession session, int team, boolean waitForRethrow) {
         YutThrowOutcome outcome = yutThrowService.throwYut();
         turnManager.applyThrow(session, outcome.result());   // 도박사면 저장값만 도↔모로 바뀐다
 
         // 원래 결과를 보낸다. 도박사 변환은 클라가 직접 한다 (Unity GameRules.ApplyThrow)
         broadcaster.broadcast(session.getRoomCode(), MessageType.THROW_RESULT,
                 new ThrowResultMessage(team, outcome.sticks(), outcome.result(), false));
+
+        // 야바위꾼을 쓸 수 있으면 넘기지 않는다 (예: 판에 말이 없는데 빽도 → 다시 던질 기회)
+        if (waitForRethrow && rethrowValidator.canRethrow(session, team)) return;
 
         // 더 던질 것도, 움직일 말도 없으면 바로 다음 팀 (예: 판에 말이 없는데 빽도)
         if (turnManager.endTurnIfNoAction(session)) {
