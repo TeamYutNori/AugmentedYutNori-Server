@@ -2,6 +2,7 @@ package com.teamyutnori.yutnori.room.service;
 
 import com.teamyutnori.yutnori.common.ConflictException;
 import com.teamyutnori.yutnori.common.NotFoundException;
+import com.teamyutnori.yutnori.game.service.GameService;
 import com.teamyutnori.yutnori.room.dto.CreateRoomRequest;
 import com.teamyutnori.yutnori.room.dto.RoomSummaryResponse;
 import com.teamyutnori.yutnori.room.model.Room;
@@ -19,6 +20,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RoomService {
     private final RoomRepository roomRepository;
+    private final GameService gameService;
+
     // 새로운 방을 생성하고 메모리 저장소에 등록
     public RoomSummaryResponse createRoom(CreateRoomRequest request) {
         Room room;
@@ -147,6 +150,7 @@ public class RoomService {
             String playerId
     ) {
         Room room = getRoomOrThrow(roomCode);
+
         synchronized (room) {
             // 실제 참가 중인 플레이어만 퇴장 가능
             if (!room.containsMember(playerId)) {
@@ -159,7 +163,17 @@ public class RoomService {
             // 마지막 플레이어가 나가면 빈 방은 저장소에서 제거
             if (room.getCurrentPlayers() == 0) {
                 roomRepository.delete(roomCode);
+                // 방이 완전히 비면 게임 세션도 같이 정리
+                gameService.removeGame(roomCode);
             }
+            return room;
+        }
+    }
+
+    public Room resetAfterGame(String roomCode) {
+        Room room = getRoomOrThrow(roomCode);
+        synchronized (room) {
+            room.resetForRematch();
             return room;
         }
     }
@@ -172,6 +186,7 @@ public class RoomService {
                         "존재하지 않는 방입니다."
                 ));
     }
+
     // 외부에서 사용하기 쉬운 6자리 대문자 방 코드 생성
     private String createRoomCode() {
         return UUID.randomUUID()

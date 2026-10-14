@@ -90,8 +90,12 @@ public class Room {
     }
 
     // 게임 시작 상태로 변경
-    public void startGame() {
-        this.status = RoomStatus.PLAYING;
+    public void startGame() { this.status = RoomStatus.PLAYING; }
+
+    // 재경기용 초기화 메서드
+    public void resetForRematch() {
+        this.status = RoomStatus.WAITING;
+        members.forEach(member -> member.setReady(false));
     }
 
     // 게임 종료 상태로 변경
