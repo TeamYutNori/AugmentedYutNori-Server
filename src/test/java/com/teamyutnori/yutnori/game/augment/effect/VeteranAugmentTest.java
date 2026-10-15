@@ -15,7 +15,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 // 노장: Unity VeteranAugment와 같은 결과인지
-//  - 이동: 빽도 0칸(못 씀), 도 1칸, 개~모 1칸 덜
+//  - 이동: 빽도·도·개·걸 그대로, 윷·모만 1칸 덜
 //  - 말 수: 기본 - 1, 마지막 슬롯 없음 / 나간 팀은 말 없음
 // 기본 판: 0 출발 → 1, 2, 3 ...
 class VeteranAugmentTest {
@@ -32,39 +32,38 @@ class VeteranAugmentTest {
     }
 
     @Test
-    @DisplayName("도는 그대로 1칸, 개~모는 1칸 덜")
+    @DisplayName("도·개·걸은 그대로, 윷·모만 1칸 덜")
     void moveCounts() {
         BoardState state = veteranBoard();
         assertEquals(1, destinationOf(state, 0, YutResult.Do));
-        assertEquals(1, destinationOf(state, 0, YutResult.Gae));
-        assertEquals(2, destinationOf(state, 0, YutResult.Geol));
+        assertEquals(2, destinationOf(state, 0, YutResult.Gae));
+        assertEquals(3, destinationOf(state, 0, YutResult.Geol));
         assertEquals(3, destinationOf(state, 0, YutResult.Yut));
         assertEquals(4, destinationOf(state, 0, YutResult.Mo));
     }
 
     @Test
-    @DisplayName("빽도는 판 위에 말이 있어도 움직일 수 없다")
-    void backDoUnusable() {
+    @DisplayName("빽도는 그대로 1칸 뒤로")
+    void backDoNormal() {
         BoardState state = veteranBoard();
-        assertTrue(state.tryMove(0, YutResult.Geol.steps(), 2).isPresent());   // 걸(1칸 덜) → 2번
-        assertTrue(state.getMovePaths(state.getPiece(0), YutResult.BackDo.steps()).isEmpty());
-        assertFalse(state.hasAnyMove(0, List.of(YutResult.BackDo.steps())));
+        assertTrue(state.tryMove(0, YutResult.Geol.steps(), 3).isPresent());   // 걸 → 3번
+        assertEquals(2, destinationOf(state, 0, YutResult.BackDo));
     }
 
     @Test
     @DisplayName("다른 팀 말에는 영향 없음")
     void otherTeamUnaffected() {
         BoardState state = veteranBoard();
-        assertEquals(2, destinationOf(state, 100, YutResult.Gae));
+        assertEquals(4, destinationOf(state, 100, YutResult.Yut));
     }
 
     @Test
-    @DisplayName("스프린터와 같이 있으면: 새 말 +1, 노장 -1 → 개는 그대로 2칸")
+    @DisplayName("스프린터와 같이 있으면: 새 말 윷은 +1 -1로 그대로 4칸, 개는 +1만 3칸")
     void withSprinter() {
         BoardState state = veteranBoard();
         state.addAugment(new SprinterAugment(0));
-        assertEquals(2, destinationOf(state, 0, YutResult.Gae));
-        assertEquals(2, destinationOf(state, 0, YutResult.Do));
+        assertEquals(4, destinationOf(state, 0, YutResult.Yut));
+        assertEquals(3, destinationOf(state, 0, YutResult.Gae));
     }
 
     // ── 말 수 (GameSession.createPieces) ──
