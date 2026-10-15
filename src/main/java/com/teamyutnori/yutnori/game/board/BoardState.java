@@ -21,7 +21,8 @@ public class BoardState {
     private final Map<Integer, Piece> pieces = new LinkedHashMap<>();   // 넣은 순서 유지 (팀 → 슬롯 순)
     private final List<BoardAugment> augments = new ArrayList<>();
 
-    // pieceIds: GameSetup.allPieceIds() (팀 → 슬롯 순). 모든 말은 대기석에서 시작
+    // pieceIds: 처음부터 둘 말 (팀 → 슬롯 순). 모든 말은 대기석에서 시작
+    // 실제 게임은 빈 목록으로 만들고, 증강 선택이 끝나면 GameSession.createPieces로 채운다
     public BoardState(BoardGraph graph, List<Integer> pieceIds) {
         this.graph = graph;
         for (int id : pieceIds) {
@@ -30,6 +31,11 @@ public class BoardState {
     }
 
     // ---------- 말 ----------
+
+    // 말 하나를 대기석에 추가 (이미 있으면 그대로). 증강 선택이 끝난 뒤 GameSession.createPieces가 부른다
+    public void addPiece(int pieceId) {
+        pieces.putIfAbsent(pieceId, new Piece(pieceId, GameSetup.teamOf(pieceId), graph.getStartNode()));
+    }
 
     public BoardGraph getGraph()            { return graph; }
     public Collection<Piece> getPieces()    { return Collections.unmodifiableCollection(pieces.values()); }

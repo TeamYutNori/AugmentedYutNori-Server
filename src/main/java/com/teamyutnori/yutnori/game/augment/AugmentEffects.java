@@ -8,6 +8,7 @@ import com.teamyutnori.yutnori.game.augment.effect.MarathonerAugment;
 import com.teamyutnori.yutnori.game.augment.effect.MonkAugment;
 import com.teamyutnori.yutnori.game.augment.effect.PacifistAugment;
 import com.teamyutnori.yutnori.game.augment.effect.SprinterAugment;
+import com.teamyutnori.yutnori.game.augment.effect.VeteranAugment;
 import com.teamyutnori.yutnori.game.board.BoardAugment;
 import org.springframework.stereotype.Component;
 
@@ -18,7 +19,7 @@ import java.util.function.IntFunction;
 
 // 증강 id → 판에 등록할 효과 객체 (Unity AugmentFactories의 서버판)
 //
-// - 이동 규칙 증강 8종: 증강을 고르면 GameService가 create()로 만들어 BoardState에 등록한다
+// - 이동 규칙 증강 9종: 증강을 고르면 GameService가 create()로 만들어 BoardState에 등록한다
 // - 던지기·턴 규칙 증강 3종(야바위꾼·사냥꾼·도박사): 판 효과가 없고, TurnManager·RethrowValidator가 보유 여부만 본다
 //
 // augments.json에 있는데 여기 없는 id가 있으면 서버 시작 때 예외 → Unity에 새 증강을 추가하면 서버도 같이 추가할 것
@@ -33,7 +34,8 @@ public class AugmentEffects {
             AugmentIds.PACIFIST,      PacifistAugment::new,
             AugmentIds.MARATHONER,    MarathonerAugment::new,
             AugmentIds.ASSASSIN,      AssassinAugment::new,
-            AugmentIds.LONER,         LonerAugment::new
+            AugmentIds.LONER,         LonerAugment::new,
+            AugmentIds.VETERAN,       VeteranAugment::new
     );
 
     private static final Set<String> RULE_ONLY = Set.of(

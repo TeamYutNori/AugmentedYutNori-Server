@@ -13,6 +13,7 @@ public final class AugmentIds {
     public static final String MARATHONER    = "Marathoner";    // 마라토너
     public static final String ASSASSIN      = "Assassin";      // 암살자
     public static final String LONER         = "Loner";         // 외톨이
+    public static final String VETERAN       = "Veteran";       // 노장 (말 수도 하나 적다 → GameSession.piecesFor)
 
     // 던지기·턴 규칙 증강 (TurnManager / RethrowValidator가 보유 여부만 확인)
     public static final String RETHROW       = "Rethrow";       // 야바위꾼

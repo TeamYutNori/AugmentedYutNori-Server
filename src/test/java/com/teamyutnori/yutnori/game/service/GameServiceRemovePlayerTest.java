@@ -48,7 +48,7 @@ class GameServiceRemovePlayerTest {
     @BeforeEach
     void setUp() {
         session = new GameSession(ROOM, new GameSetup(3, 2, "default", false),
-                Map.of("p0", 0, "p1", 1, "p2", 2), TestBoards.defaultBoard());
+                Map.of("p0", 0, "p1", 1, "p2", 2), TestBoards.defaultBoard()).createPieces();
         session.setPhase(GamePhase.PLAYING);
         session.setCurrentTeam(0);
 

@@ -61,7 +61,7 @@ class AutoPlayServiceTest {
     @BeforeEach
     void setUp() {
         session = new GameSession(ROOM, new GameSetup(2, 2, "default", false),
-                Map.of("p0", 0, "p1", 1), TestBoards.defaultBoard());
+                Map.of("p0", 0, "p1", 1), TestBoards.defaultBoard()).createPieces();
         session.setPhase(GamePhase.PLAYING);
         session.setCurrentTeam(0);
         session.setRemainingThrows(1);

@@ -54,7 +54,7 @@ class GameServiceMoveTest {
     void setUp() {
         // 팀 0(p0)의 차례, 던지기는 끝났고 개(2칸) 결과를 가진 상태
         session = new GameSession(ROOM, new GameSetup(2, 2, "default", false), Map.of("p0", 0, "p1", 1),
-                TestBoards.defaultBoard());
+                TestBoards.defaultBoard()).createPieces();
         session.setPhase(GamePhase.PLAYING);
         session.setCurrentTeam(0);
         session.getStoredResults().add(YutResult.Gae);

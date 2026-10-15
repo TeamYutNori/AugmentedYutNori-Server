@@ -46,7 +46,7 @@ class GameServiceRethrowWaitTest {
     @BeforeEach
     void setUp() {
         session = new GameSession(ROOM, new GameSetup(2, 2, "default", false), Map.of("p0", 0, "p1", 1),
-                TestBoards.defaultBoard());
+                TestBoards.defaultBoard()).createPieces();
         session.setPhase(GamePhase.PLAYING);
         new TurnManager().startFirstTurn(session);   // 팀 0, 던지기 1번
 

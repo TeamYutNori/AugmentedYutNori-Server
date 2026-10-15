@@ -1,5 +1,6 @@
 package com.teamyutnori.yutnori.game.model;
 
+import com.teamyutnori.yutnori.game.augment.AugmentIds;
 import com.teamyutnori.yutnori.game.board.BoardGraph;
 import com.teamyutnori.yutnori.game.board.BoardState;
 import com.teamyutnori.yutnori.game.yut.YutResult;
@@ -53,7 +54,7 @@ public class GameSession {
         this.setup = setup;
         this.playerTeams = Map.copyOf(playerTeams);
         this.board = board;
-        this.boardState = new BoardState(board, setup.allPieceIds());   // 모든 말은 대기석에서 시작
+        this.boardState = new BoardState(board, List.of());   // 말은 증강 선택이 끝난 뒤 createPieces()로 만든다 (팀별 말 수가 증강에 따라 달라서)
         for (int t = 0; t < setup.teamCount(); t++) {
             ownedAugments.put(t, new HashSet<>());
             offeredAugments.put(t, List.of());        // 아직 제시 안 함 = 빈 목록
@@ -69,6 +70,26 @@ public class GameSession {
                 .filter(e -> e.getValue() == team)
                 .map(Map.Entry::getKey)
                 .findFirst();
+    }
+
+    // ── 말 생성 ──
+    // 모든 팀의 증강이 정해지면 한 번 만든다 (Unity: 마지막 AUGMENT_SELECTED 때 생성, 같은 규칙)
+    //  - 나간 팀(증강을 고른 뒤 나간 경우 포함)은 말을 만들지 않는다
+    //  - 팀별 말 수 = piecesFor(team), 슬롯 0부터 (노장 팀은 마지막 슬롯 없음: 4개 기준 100·101·102)
+    // 이미 있는 말은 그대로 둔다. 체이닝용으로 자기 자신을 돌려준다
+    public GameSession createPieces() {
+        for (int team = 0; team < setup.teamCount(); team++) {
+            if (removedTeams.contains(team)) continue;
+            for (int slot = 0; slot < piecesFor(team); slot++) {
+                boardState.addPiece(GameSetup.pieceId(team, slot));
+            }
+        }
+        return this;
+    }
+
+    // 팀의 말 수: 기본 말 수에서 노장이면 1개 적게 (Unity VeteranAugment.PieceCountFor와 같은 규칙)
+    public int piecesFor(int team) {
+        return setup.piecesPerTeam() - (hasAugment(team, AugmentIds.VETERAN) ? 1 : 0);
     }
 
     // ── 퇴장 ──

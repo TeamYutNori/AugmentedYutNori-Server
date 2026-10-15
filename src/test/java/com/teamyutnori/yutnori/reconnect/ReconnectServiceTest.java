@@ -40,7 +40,7 @@ class ReconnectServiceTest {
     @BeforeEach
     void setUp() {
         // 팀 1 차례, 걸·개 결과 보유, 팀 0은 FriendShield 보유
-        session = new GameSession(ROOM, new GameSetup(2, 2, "default", false), Map.of("p0", 0, "p1", 1), TestBoards.defaultBoard());
+        session = new GameSession(ROOM, new GameSetup(2, 2, "default", false), Map.of("p0", 0, "p1", 1), TestBoards.defaultBoard()).createPieces();
         session.setPhase(GamePhase.PLAYING);
         session.setCurrentTeam(1);
         session.setRemainingThrows(1);
