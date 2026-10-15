@@ -14,6 +14,8 @@ public class Room {
     private final boolean isPublic;
     // 방 최대 인원
     private final int maxPlayers;
+    // 방 최소 인원
+    private static final int MIN_PLAYERS = 2;
     // 제한 시간
     private final int timeLimit;
     // 현재 방 상태
@@ -76,8 +78,8 @@ public class Room {
         return members.size();
     }
 
-    // 게임 시작에 필요한 인원이 모두 들어왔는지 확인
-    public boolean hasEnoughPlayers() { return members.size() == maxPlayers; }
+    // 게임 시작에 필요한 인원이 모두 들어왔는지 확인 (최소 2명)
+    public boolean hasEnoughPlayers() { return members.size() >= MIN_PLAYERS; }
 
     // 방이 가득 찼는지 확인
     public boolean isFull() {
