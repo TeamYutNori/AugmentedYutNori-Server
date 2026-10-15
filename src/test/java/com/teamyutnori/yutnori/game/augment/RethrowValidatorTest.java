@@ -25,7 +25,7 @@ class RethrowValidatorTest {
 
     @BeforeEach
     void setUp() {
-        session = new GameSession("ROOM", new GameSetup(2, 2, "default", false), Map.of("p0", 0, "p1", 1), TestBoards.defaultBoard());
+        session = new GameSession("ROOM", new GameSetup(2, 2, "default", false), Map.of("p0", 0, "p1", 1), TestBoards.defaultBoard()).createPieces();
         turnManager.startFirstTurn(session);
         session.addAugment(0, RethrowValidator.RETHROW_AUGMENT_ID);
     }

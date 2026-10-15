@@ -445,8 +445,10 @@ public class GameService implements GameEndPort {
         }
     }
 
-    // 증강 선택 끝 → 첫 턴 시작
+    // 증강 선택 끝 → 말 생성 → 첫 턴 시작
+    // 말은 여기서 처음 만든다 (노장은 하나 적게, 나간 팀은 없음. 클라도 마지막 AUGMENT_SELECTED 때 같은 규칙으로 만든다)
     private void startPlaying(GameSession session) {
+        session.createPieces();
         session.setPhase(GamePhase.PLAYING);
         turnManager.startFirstTurn(session);
         broadcastTurnChanged(session);

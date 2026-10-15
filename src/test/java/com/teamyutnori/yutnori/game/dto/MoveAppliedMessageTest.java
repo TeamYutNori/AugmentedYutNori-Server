@@ -47,7 +47,7 @@ class MoveAppliedMessageTest {
     @Test
     void of에_auto를_넘기면_그대로_담긴다() {
         GameSession session = new GameSession("ROOM", new GameSetup(2, 2, "default", false),
-                Map.of("p0", 0, "p1", 1), TestBoards.defaultBoard());
+                Map.of("p0", 0, "p1", 1), TestBoards.defaultBoard()).createPieces();
         MoveResult result = session.getBoardState().tryMove(0, 2, 2).orElseThrow();   // 팀 0의 0번 말, 개(2칸) → 2번 칸
 
         assertTrue(MoveAppliedMessage.of(0, result, "hash", true).auto());

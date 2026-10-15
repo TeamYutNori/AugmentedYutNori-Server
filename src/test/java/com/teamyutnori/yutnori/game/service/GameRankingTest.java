@@ -24,7 +24,7 @@ class GameRankingTest {
     @BeforeEach
     void setUp() {
         session = new GameSession("ROOM01", new GameSetup(4, 2, "default", false),
-                Map.of("p0", 0, "p1", 1, "p2", 2, "p3", 3), TestBoards.defaultBoard());
+                Map.of("p0", 0, "p1", 1, "p2", 2, "p3", 3), TestBoards.defaultBoard()).createPieces();
     }
 
     // 말 하나를 한 바퀴 돌려 완주시킨다 (4 → 9 → 14 → 19 → 도착)
