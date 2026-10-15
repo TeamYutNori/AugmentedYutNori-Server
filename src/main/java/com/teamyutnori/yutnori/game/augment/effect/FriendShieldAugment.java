@@ -6,7 +6,7 @@ import com.teamyutnori.yutnori.game.board.Piece;
 
 import java.util.List;
 
-// 프렌드쉴드: 업힌 내 말이 잡혀도 한 마리만 대기석으로 돌아간다 (Unity FriendShieldAugment)
+// 경호원: 업힌 내 말이 잡혀도 한 마리만 대기석으로 돌아간다 (Unity FriendShieldAugment)
 public class FriendShieldAugment extends TeamAugment {
 
     public FriendShieldAugment(int ownerTeam) { super(ownerTeam); }

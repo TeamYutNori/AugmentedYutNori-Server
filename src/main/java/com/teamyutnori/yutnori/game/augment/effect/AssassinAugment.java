@@ -16,8 +16,8 @@ public class AssassinAugment extends TeamAugment {
     @Override
     public String id() { return AugmentIds.ASSASSIN; }
 
-    // 평화주의자(0)보다 나중, 프렌드쉴드(20)보다 먼저
-    // → 평화주의자 팀도 잡을 수 있고, 프렌드쉴드 팀의 업힌 말은 한 마리만 잡힌다
+    // 평화주의자(0)보다 나중, 경호원(20)보다 먼저
+    // → 평화주의자 팀도 잡을 수 있고, 경호원 팀의 업힌 말은 한 마리만 잡힌다
     @Override
     public int priority() { return 10; }
 

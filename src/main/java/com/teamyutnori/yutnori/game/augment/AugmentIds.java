@@ -8,7 +8,7 @@ public final class AugmentIds {
     public static final String CONTRARIAN    = "Contrarian";    // 청개구리
     public static final String SPRINTER      = "Sprinter";      // 스프린터
     public static final String MONK          = "Monk";          // 수행자
-    public static final String FRIEND_SHIELD = "FriendShield";  // 프렌드쉴드
+    public static final String FRIEND_SHIELD = "FriendShield";  // 경호원
     public static final String PACIFIST      = "Pacifist";      // 평화주의자
     public static final String MARATHONER    = "Marathoner";    // 마라토너
     public static final String ASSASSIN      = "Assassin";      // 암살자

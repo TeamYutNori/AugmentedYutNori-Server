@@ -116,7 +116,7 @@ class BoardAugmentEffectTest {
     }
 
     @Test
-    @DisplayName("프렌드쉴드: 업힌 말이 잡혀도 한 마리만 대기석으로")
+    @DisplayName("경호원: 업힌 말이 잡혀도 한 마리만 대기석으로")
     void friendShield() {
         state.addAugment(new FriendShieldAugment(1));
         move(100, 2, 2);
@@ -127,7 +127,7 @@ class BoardAugmentEffectTest {
     }
 
     @Test
-    @DisplayName("암살자(10) → 프렌드쉴드(20) 순서: 업힌 말은 한 마리만 잡힌다")
+    @DisplayName("암살자(10) → 경호원(20) 순서: 업힌 말은 한 마리만 잡힌다")
     void assassinThenFriendShield() {
         state.addAugment(new FriendShieldAugment(1));   // 등록 순서와 상관없이 우선순위대로
         state.addAugment(new AssassinAugment(0));
