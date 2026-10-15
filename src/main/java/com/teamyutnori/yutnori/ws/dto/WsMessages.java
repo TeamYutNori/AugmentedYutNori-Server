@@ -78,9 +78,14 @@ public final class WsMessages {
 
     // 서버가 현재 방 전체 상태를 클라이언트들에게 전달할 때 사용하는 메시지
     // JOIN_ROOM, READY, LEAVE_ROOM 등으로 방 상태가 바뀔 때 최신 상태를 모든 참가자에게 ROOM_STATE로 방송하기 위해 사용
-    public record RoomStateMessage(String roomCode, RoomStatus status,
-                                   int currentPlayers, int maxPlayers, List<RoomMemberMessage> members) {
-
+    public record RoomStateMessage(
+            String roomCode,
+            RoomStatus status,
+            int currentPlayers,
+            int maxPlayers,
+            String hostPlayerId,
+            List<RoomMemberMessage> members
+    ) {
         // 현재 Room 객체의 상태를 기준으로
         // 클라이언트에게 보낼 ROOM_STATE 메시지 데이터를 생성
         public static RoomStateMessage from(Room room) {
@@ -90,6 +95,7 @@ public final class WsMessages {
                     room.getStatus(),
                     room.getCurrentPlayers(),
                     room.getMaxPlayers(),
+                    room.getHostPlayerId(),
                     members
             );
         }

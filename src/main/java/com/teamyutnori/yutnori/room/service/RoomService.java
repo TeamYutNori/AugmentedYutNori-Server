@@ -2,6 +2,7 @@ package com.teamyutnori.yutnori.room.service;
 
 import com.teamyutnori.yutnori.common.ConflictException;
 import com.teamyutnori.yutnori.common.NotFoundException;
+import com.teamyutnori.yutnori.common.ForbiddenException;
 import com.teamyutnori.yutnori.game.service.GameService;
 import com.teamyutnori.yutnori.room.dto.CreateRoomRequest;
 import com.teamyutnori.yutnori.room.dto.RoomSummaryResponse;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.util.UUID;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.function.Predicate;
 
 @Service
 @RequiredArgsConstructor
@@ -56,6 +58,7 @@ public class RoomService {
         Room room = getRoomOrThrow(roomCode);
         // 같은 방에 여러 요청이 동시에 들어와도 참가자 상태가 꼬이지 않도록 동기화
         synchronized (room) {
+
             // 게임 시작 전인 방에만 새 플레이어가 참가 가능
             if (room.getStatus() != RoomStatus.WAITING) {
                 throw new ConflictException(
@@ -114,21 +117,68 @@ public class RoomService {
         }
     }
 
-    // 게임 시작 조건 확인과 상태 변경을 한 번에 처리
-    public boolean tryStartGame(String roomCode) {
+    // 방장의 게임 시작 요청 처리
+    public Room requestGameStart(
+            String roomCode,
+            String requesterId,
+            Predicate<String> isConnected
+    ) {
         Room room = getRoomOrThrow(roomCode);
+
+        // 같은 방에 여러 요청이 동시에 들어와도 참가자 상태가 꼬이지 않도록 동기화
         synchronized (room) {
-            // 이미 시작된 방이면 다시 시작하지 않음
+
+            // 방장만 시작 가능
+            if (!room.isHost(requesterId)) {
+                throw new ForbiddenException(
+                        "ONLY_HOST_CAN_START",
+                        "방장만 게임을 시작할 수 있습니다."
+                );
+            }
+
+            // 대기 중인 방만 시작 가능
             if (room.getStatus() != RoomStatus.WAITING) {
-                return false;
+                throw new ConflictException(
+                        "ROOM_ALREADY_STARTED",
+                        "이미 게임이 시작된 방입니다."
+                );
             }
-            // 최대 인원이 모두 참가하고 전원이 준비되어 있어야 시작 가능
-            if (!room.hasEnoughPlayers() || !room.isAllReady()) {
-                return false;
+
+            // 게임은 2 ~ 4명일 때만 시작 가능
+            int playerCount = room.getCurrentPlayers();
+            if (playerCount < 2 || playerCount > 4) {
+                throw new ConflictException(
+                        "INVALID_PLAYER_COUNT",
+                        "게임은 2명에서 4명까지 시작할 수 있습니다."
+                );
             }
-            // 조건을 만족한 첫 요청만 방 상태를 PLAYING으로 변경
+
+            // 참가자 전원이 준비 상태여야 함
+            if (!room.isAllReady()) {
+                throw new ConflictException(
+                        "PLAYERS_NOT_READY",
+                        "모든 참가자가 준비해야 합니다."
+                );
+            }
+
+            // 참가자 전원이 WebSocket에 연결되어 있어야 함
+            boolean allConnected = room.getMembers()
+                    .stream()
+                    .allMatch(member -> isConnected.test(member.getPlayerId())
+                    );
+
+            if (!allConnected) {
+                throw new ConflictException(
+                        "PLAYER_DISCONNECTED",
+                        "연결이 끊긴 참가자가 있습니다."
+                );
+            }
+
+            // 퇴장으로 비어 있는 팀 번호가 있다면 0 ~ N-1로 다시 정리
+            room.normalizeTeams();
+            // 중복 요청이 다시 통과하지 못하도록 PLAYING으로 변경
             room.startGame();
-            return true;
+            return room;
         }
     }
 

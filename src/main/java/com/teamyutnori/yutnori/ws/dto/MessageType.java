@@ -9,6 +9,7 @@ public enum MessageType {
     CREATE_ROOM,        // C→S 방 만들기
     JOIN_ROOM,          // C→S 방 참가
     READY,              // C→S 준비 / 준비 해제
+    START_GAME,         // C→S 방장의 게임 시작 요청
     LEAVE_ROOM,         // C→S 방 나가기
     ROOM_STATE,         // S→C 방 인원·준비 상태 갱신
     GAME_START,         // S→C 게임 시작 (GameSetup 값 전달)
