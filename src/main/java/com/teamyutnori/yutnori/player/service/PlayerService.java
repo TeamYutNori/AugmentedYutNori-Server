@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.util.UUID;
 
 @Service
@@ -20,6 +21,7 @@ import java.util.UUID;
 public class PlayerService {
 
     private final PlayerRepository playerRepository;
+    private final Clock clock;
 
     // Unity 에디터 테스트용 게스트 플레이어 생성
     @Transactional
@@ -46,25 +48,34 @@ public class PlayerService {
     // Firebase 로그인 사용자를 조회하고,
     // 처음 로그인한 사용자라면 새로운 Player 생성
     @Transactional
+    // anonymous: Firebase 익명 로그인("게스트로 시작")이면 true → 새 Player를 게스트로 만든다
+    // 로그인할 때마다 마지막 접속 시각을 기록한다 (오래 안 들어온 게스트 정리 기준)
     public Player findOrCreateByFirebase(
             String firebaseUid,
-            String email
+            String email,
+            boolean anonymous
     ) {
 
-        return playerRepository.findByFirebaseUid(firebaseUid)
+        Player player = playerRepository.findByFirebaseUid(firebaseUid)
                 .orElseGet(() -> {
 
                     // 처음 로그인한 사용자가 게임에서 사용할 playerId 생성
                     String playerId = UUID.randomUUID().toString();
 
-                    Player player = Player.createFirebase(
-                            playerId,
-                            firebaseUid,
-                            email
-                    );
+                    Player created = anonymous
+                            ? Player.createFirebaseGuest(playerId, firebaseUid)
+                            : Player.createFirebase(playerId, firebaseUid, email);
 
-                    return playerRepository.save(player);
+                    return playerRepository.save(created);
                 });
+
+        // 같은 Firebase UID에 구글 계정이 연결돼 익명이 아닌 로그인으로 들어오면 일반 계정으로 바꾼다
+        if (player.isGuest() && !anonymous) {
+            player.upgradeToGoogle(email);
+        }
+
+        player.recordLogin(clock.instant());
+        return player;
     }
 
     // 플레이어의 계정 닉네임 변경

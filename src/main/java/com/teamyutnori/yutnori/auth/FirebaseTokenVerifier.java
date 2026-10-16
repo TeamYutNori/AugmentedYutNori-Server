@@ -24,7 +24,8 @@ public class FirebaseTokenVerifier {
             return new VerifiedUser(
                     token.getUid(),
                     token.getEmail(),
-                    name
+                    name,
+                    isAnonymous(token)
             );
         } catch (FirebaseAuthException e) {
             throw new UnauthorizedException(
@@ -34,10 +35,21 @@ public class FirebaseTokenVerifier {
         }
     }
 
+    // Firebase ID 토큰의 firebase.sign_in_provider가 "anonymous"면 익명 로그인("게스트로 시작")
+    static boolean isAnonymous(FirebaseToken token) {
+        return isAnonymousProvider(token.getClaims().get("firebase"));
+    }
+
+    static boolean isAnonymousProvider(Object firebaseClaim) {
+        return firebaseClaim instanceof java.util.Map<?, ?> firebase
+                && "anonymous".equals(firebase.get("sign_in_provider"));
+    }
+
     public record VerifiedUser(
             String uid,
             String email,
-            String name
+            String name,
+            boolean anonymous   // 익명 로그인(게스트)이면 true
     ) {
     }
 }

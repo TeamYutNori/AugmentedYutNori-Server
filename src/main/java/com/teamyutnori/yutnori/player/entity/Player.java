@@ -8,6 +8,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.ColumnDefault;
 
+import java.time.Instant;
+
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -52,6 +54,16 @@ public class Player {
     @Column(length = 64)
     private String selectedIconId;
 
+    // Firebase 익명 로그인("게스트로 시작")으로 만든 계정이면 true.
+    // 오래 접속하지 않으면 GuestCleanupService가 지운다. 예전 에디터 테스트용 게스트(guestToken)와는 별개
+    @Column(nullable = false)
+    @ColumnDefault("false")
+    private boolean guest;
+
+    // 마지막으로 /auth/firebase 로그인한 시각. 게스트 정리 기준
+    @Column
+    private Instant lastLoginAt;
+
     // 게스트 플레이어 생성
     public static Player createGuest(
             String playerId,
@@ -80,6 +92,27 @@ public class Player {
         player.email = email;
 
         return player;
+    }
+
+    // Firebase 익명 로그인 사용자를 처음 Player로 생성 (게스트, 이메일 없음)
+    public static Player createFirebaseGuest(
+            String playerId,
+            String firebaseUid
+    ) {
+        Player player = createFirebase(playerId, firebaseUid, null);
+        player.guest = true;
+        return player;
+    }
+
+    // 로그인할 때마다 마지막 접속 시각 기록
+    public void recordLogin(Instant now) {
+        this.lastLoginAt = now;
+    }
+
+    // 게스트 계정이 구글 계정으로 바뀜 (같은 Firebase UID에 구글이 연결된 경우). 이후 정리 대상에서 빠진다
+    public void upgradeToGoogle(String email) {
+        this.guest = false;
+        this.email = email;
     }
 
     // 닉네임 설정 또는 변경

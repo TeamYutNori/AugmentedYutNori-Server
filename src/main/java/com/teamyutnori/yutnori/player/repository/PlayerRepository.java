@@ -3,6 +3,8 @@ package com.teamyutnori.yutnori.player.repository;
 import com.teamyutnori.yutnori.player.entity.Player;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 public interface PlayerRepository extends JpaRepository<Player, Long> {
@@ -18,4 +20,7 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
 
     // 닉네임 중복 확인
     boolean existsByNickname(String nickname);
+
+    // 마지막 접속이 cutoff보다 오래된 게스트 (GuestCleanupService 정리 대상)
+    List<Player> findByGuestTrueAndLastLoginAtBefore(Instant cutoff);
 }

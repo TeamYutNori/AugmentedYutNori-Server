@@ -32,9 +32,11 @@ public class AuthController {
 
         // 2. Firebase UID에 연결된 기존 Player 조회
         //    처음 로그인한 사용자라면 새 Player 생성
+        //    익명 로그인("게스트로 시작")이면 게스트 Player로 만든다
         Player player = playerService.findOrCreateByFirebase(
                 user.uid(),
-                user.email()
+                user.email(),
+                user.anonymous()
         );
 
         // 3. 우리 서버에서 사용할 토큰 발급
@@ -50,7 +52,8 @@ public class AuthController {
                 player.getPlayerId(),
                 player.getNickname(),
                 token,
-                player.getGold()
+                player.getGold(),
+                player.isGuest()
         );
     }
 }

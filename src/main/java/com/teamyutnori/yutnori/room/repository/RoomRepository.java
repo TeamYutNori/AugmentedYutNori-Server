@@ -39,6 +39,14 @@ public class RoomRepository {
         return rooms.containsKey(code);
     }
 
+    // 이 플레이어가 들어가 있는 방(대기 중이거나 게임 중)이 있는지. 게스트 정리 때 접속 중인 플레이어를 건너뛰는 데 쓴다
+    public boolean containsPlayer(String playerId) {
+        return rooms.values()
+                .stream()
+                .anyMatch(room -> room.getMembers().stream()
+                        .anyMatch(member -> member.getPlayerId().equals(playerId)));
+    }
+
     // 빠른 참가가 가능한 공개 대기방 조회
     public Optional<Room> findJoinableRoom() {
         return rooms.values()

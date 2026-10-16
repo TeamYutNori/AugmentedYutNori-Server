@@ -12,4 +12,7 @@ public interface PlayerIconRepository extends JpaRepository<PlayerIcon, Long> {
 
     // 이 플레이어가 가진 아이콘 전부 (도감)
     List<PlayerIcon> findAllByPlayerId(String playerId);
+
+    // 게스트 정리 (GuestCleanupService)
+    void deleteByPlayerId(String playerId);
 }

@@ -10,4 +10,7 @@ public interface PlayerAchievementRepository extends JpaRepository<PlayerAchieve
     Optional<PlayerAchievement> findByPlayerIdAndAchievementId(String playerId, String achievementId);
 
     List<PlayerAchievement> findAllByPlayerId(String playerId);
+
+    // 게스트 정리 (GuestCleanupService)
+    void deleteByPlayerId(String playerId);
 }
