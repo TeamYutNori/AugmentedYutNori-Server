@@ -37,6 +37,10 @@ dependencies {
     testAnnotationProcessor 'org.projectlombok:lombok'
     implementation 'me.paulschwarz:springboot4-dotenv:5.1.0'
     implementation 'com.google.firebase:firebase-admin:9.11.0'
+    // 서버 로그인 토큰(JWT) 서명·검증. JSON 처리는 gson 사용 (서버 Jackson 3와 충돌 방지)
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-gson:0.12.6'
 }
 
 tasks.named('test') {
