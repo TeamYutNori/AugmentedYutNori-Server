@@ -44,9 +44,10 @@ class GuestCleanupServiceTest {
         playerIconRepository = mock(PlayerIconRepository.class);
         roomRepository = mock(RoomRepository.class);
         firebaseAuth = mock(FirebaseAuth.class);
+        PlayerDataRemover remover = new PlayerDataRemover(
+                playerRepository, playerStatRepository, playerAchievementRepository, playerIconRepository, firebaseAuth);
         service = new GuestCleanupService(
-                playerRepository, playerStatRepository, playerAchievementRepository, playerIconRepository,
-                roomRepository, firebaseAuth, TransactionOperations.withoutTransaction(),
+                playerRepository, roomRepository, remover, TransactionOperations.withoutTransaction(),
                 Clock.fixed(NOW, ZoneOffset.UTC), 30);
     }
 

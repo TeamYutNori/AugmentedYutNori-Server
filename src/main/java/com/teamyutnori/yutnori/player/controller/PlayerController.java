@@ -6,6 +6,7 @@ import com.teamyutnori.yutnori.player.dto.ChangeNicknameRequest;
 import com.teamyutnori.yutnori.player.dto.CreatePlayerRequest;
 import com.teamyutnori.yutnori.player.dto.CreatedPlayerResponse;
 import com.teamyutnori.yutnori.player.dto.PlayerProfileResponse;
+import com.teamyutnori.yutnori.player.service.AccountWithdrawalService;
 import com.teamyutnori.yutnori.player.service.PlayerService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 public class PlayerController {
     private final PlayerService playerService;
     private final TokenProvider tokenProvider;
+    private final AccountWithdrawalService accountWithdrawalService;
 
     // Unity 에디터 테스트용 게스트 플레이어 생성
     @PostMapping
@@ -83,6 +85,24 @@ public class PlayerController {
         playerService.changeIcon(playerId, request);
 
         // 변경 성공 시 응답 본문 없이 204 반환
+        return ResponseEntity.noContent().build();
+    }
+
+    // 회원 탈퇴: 계정 데이터(닉네임·골드·아이콘·업적)와 Firebase 계정을 완전히 삭제한다. 전적은 익명 통계로 유지
+    // 방·게임에 참가 중이면 409 IN_ROOM. 같은 구글 계정으로 다시 로그인하면 새 계정이 만들어진다
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> withdraw(
+            @RequestHeader("Authorization") String authorization
+    ) {
+        // Authorization 헤더에서 서버 토큰 추출
+        String token = authorization.replaceFirst("^Bearer ", "");
+
+        // 토큰을 이용해 현재 로그인한 플레이어 확인
+        String playerId = tokenProvider.getPlayerId(token);
+
+        accountWithdrawalService.withdraw(playerId);
+
+        // 탈퇴 성공 시 응답 본문 없이 204 반환
         return ResponseEntity.noContent().build();
     }
 }
