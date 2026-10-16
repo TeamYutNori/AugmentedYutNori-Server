@@ -57,19 +57,19 @@ class GuestCleanupServiceTest {
 
     @Test
     void 기준일은_지금부터_30일_전이다() {
-        when(playerRepository.findByGuestTrueAndLastLoginAtBefore(any())).thenReturn(List.of());
+        when(playerRepository.findByLastLoginAtBefore(any())).thenReturn(List.of());
 
         service.cleanup();
 
         ArgumentCaptor<Instant> cutoff = ArgumentCaptor.forClass(Instant.class);
-        verify(playerRepository).findByGuestTrueAndLastLoginAtBefore(cutoff.capture());
+        verify(playerRepository).findByLastLoginAtBefore(cutoff.capture());
         assertThat(cutoff.getValue()).isEqualTo(NOW.minus(Duration.ofDays(30)));
     }
 
     @Test
     void 오래된_게스트의_데이터와_Firebase_계정을_지운다() throws Exception {
         Player old = guest("p1", "uid-1");
-        when(playerRepository.findByGuestTrueAndLastLoginAtBefore(any())).thenReturn(List.of(old));
+        when(playerRepository.findByLastLoginAtBefore(any())).thenReturn(List.of(old));
 
         int deleted = service.cleanup();
 
@@ -82,10 +82,23 @@ class GuestCleanupServiceTest {
     }
 
     @Test
+    void 구글_계정도_오래되면_같이_지운다() throws Exception {
+        Player google = Player.createFirebase("p9", "google-uid", "a@example.com");
+        Player oldGuest = guest("p1", "uid-1");
+        when(playerRepository.findByLastLoginAtBefore(any())).thenReturn(List.of(google, oldGuest));
+
+        assertThat(service.cleanup()).isEqualTo(2);
+
+        verify(playerRepository).delete(google);
+        verify(playerStatRepository).deleteByPlayerId("p9");
+        verify(firebaseAuth).deleteUsers(List.of("google-uid", "uid-1"));
+    }
+
+    @Test
     void 방이나_게임에_들어가_있는_게스트는_건너뛴다() throws Exception {
         Player playing = guest("p1", "uid-1");
         Player idle = guest("p2", "uid-2");
-        when(playerRepository.findByGuestTrueAndLastLoginAtBefore(any())).thenReturn(List.of(playing, idle));
+        when(playerRepository.findByLastLoginAtBefore(any())).thenReturn(List.of(playing, idle));
         when(roomRepository.containsPlayer("p1")).thenReturn(true);
 
         int deleted = service.cleanup();
@@ -99,7 +112,7 @@ class GuestCleanupServiceTest {
 
     @Test
     void 대상이_없으면_아무것도_지우지_않는다() throws Exception {
-        when(playerRepository.findByGuestTrueAndLastLoginAtBefore(any())).thenReturn(List.of());
+        when(playerRepository.findByLastLoginAtBefore(any())).thenReturn(List.of());
 
         assertThat(service.cleanup()).isZero();
 
@@ -110,7 +123,7 @@ class GuestCleanupServiceTest {
     @Test
     void Firebase_삭제가_실패해도_DB_정리는_끝난다() throws Exception {
         Player old = guest("p1", "uid-1");
-        when(playerRepository.findByGuestTrueAndLastLoginAtBefore(any())).thenReturn(List.of(old));
+        when(playerRepository.findByLastLoginAtBefore(any())).thenReturn(List.of(old));
         when(firebaseAuth.deleteUsers(anyList())).thenThrow(mock(FirebaseAuthException.class));
 
         assertThat(service.cleanup()).isEqualTo(1);
