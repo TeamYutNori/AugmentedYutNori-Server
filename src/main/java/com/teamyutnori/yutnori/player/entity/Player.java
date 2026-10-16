@@ -36,7 +36,8 @@ public class Player {
     private String email;
 
     // 게임에서 사용하는 닉네임
-    @Column(unique = true, length = 20)
+    // 다른 플레이어와 같아도 된다 (플레이어 구분은 playerId). 예전 DB의 유니크 인덱스는 NicknameUniqueIndexRemover가 지운다
+    @Column(length = 20)
     private String nickname;
 
     // 에디터 테스트용 게스트 로그인 토큰

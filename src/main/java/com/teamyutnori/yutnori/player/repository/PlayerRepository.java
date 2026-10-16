@@ -18,9 +18,6 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
     // 게스트 토큰으로 Player 조회
     Optional<Player> findByGuestToken(String guestToken);
 
-    // 닉네임 중복 확인
-    boolean existsByNickname(String nickname);
-
     // 마지막 접속이 cutoff보다 오래된 게스트 (GuestCleanupService 정리 대상)
     List<Player> findByGuestTrueAndLastLoginAtBefore(Instant cutoff);
 }

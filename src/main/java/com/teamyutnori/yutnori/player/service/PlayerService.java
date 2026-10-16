@@ -1,6 +1,5 @@
 package com.teamyutnori.yutnori.player.service;
 
-import com.teamyutnori.yutnori.common.ConflictException;
 import com.teamyutnori.yutnori.common.NotFoundException;
 import com.teamyutnori.yutnori.player.dto.ChangeNicknameRequest;
 import com.teamyutnori.yutnori.player.dto.CreatePlayerRequest;
@@ -87,18 +86,12 @@ public class PlayerService {
         // playerId로 현재 로그인한 플레이어 조회
         Player player = getPlayerOrThrow(playerId);
 
-        // 같은 닉네임을 그대로 다시 설정하는 경우는 허용
+        // 같은 닉네임을 그대로 다시 설정하는 경우는 그냥 둔다
+        // 다른 플레이어와 닉네임이 같아도 된다 (플레이어 구분은 playerId)
         if (request.nickname().equals(player.getNickname())) {
             return;
         }
 
-        // 이미 다른 계정에서 사용 중인 닉네임인지 확인
-        if (playerRepository.existsByNickname(request.nickname())) {
-            throw new ConflictException(
-                    "DUPLICATE_NICKNAME",
-                    "이미 사용 중인 닉네임입니다."
-            );
-        }
         // Player 엔티티의 닉네임 변경
         player.changeNickname(request.nickname());
     }
