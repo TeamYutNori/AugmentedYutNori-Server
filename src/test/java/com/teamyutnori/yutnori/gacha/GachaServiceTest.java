@@ -1,7 +1,9 @@
 package com.teamyutnori.yutnori.gacha;
 
 import com.teamyutnori.yutnori.common.ConflictException;
+import com.teamyutnori.yutnori.common.InvalidRequestException;
 import com.teamyutnori.yutnori.common.NotFoundException;
+import com.teamyutnori.yutnori.gacha.dto.GachaDrawResult;
 import com.teamyutnori.yutnori.gacha.dto.GachaResultResponse;
 import com.teamyutnori.yutnori.game.yut.SequenceRandomProvider;
 import com.teamyutnori.yutnori.icon.IconCatalog;
@@ -39,8 +41,8 @@ class GachaServiceTest {
     }
 
     // 0.0이면 첫 번째(icon_001), 0.99면 마지막(icon_022)
-    private GachaService service(double roll) {
-        return new GachaService(playerRepository, playerIconRepository, iconCatalog, new SequenceRandomProvider(roll),
+    private GachaService service(double... rolls) {
+        return new GachaService(playerRepository, playerIconRepository, iconCatalog, new SequenceRandomProvider(rolls),
                 eventPublisher);
     }
 
@@ -99,5 +101,77 @@ class GachaServiceTest {
         assertThatThrownBy(() -> service(0.0).draw("ghost"))
                 .isInstanceOf(NotFoundException.class)
                 .hasFieldOrPropertyWithValue("code", "PLAYER_NOT_FOUND");
+    }
+
+    @Test
+    void 십연차는_골드를_한_번에_빼고_10개를_순서대로_준다() {
+        player.addGold(2500);
+
+        GachaResultResponse result = service(0.0, 0.99).draw("p1", 10);
+
+        assertThat(result.results()).hasSize(10);
+        assertThat(result.results()).extracting(GachaDrawResult::iconId)
+                .containsExactly("icon_001", "icon_022", "icon_001", "icon_022", "icon_001",
+                        "icon_022", "icon_001", "icon_022", "icon_001", "icon_022");
+        assertThat(result.price()).isEqualTo(GachaService.PRICE * 10);
+        assertThat(result.gold()).isEqualTo(500);
+        assertThat(player.getGold()).isEqualTo(500);
+    }
+
+    @Test
+    void 같은_십연차_안에서_두_번_나오면_두_번째부터_중복이고_저장은_한_번() {
+        player.addGold(2000);
+
+        GachaResultResponse result = service(0.0).draw("p1", 10);   // 10번 모두 icon_001
+
+        assertThat(result.results().get(0)).isEqualTo(new GachaDrawResult("icon_001", false, 1));
+        assertThat(result.results().get(1)).isEqualTo(new GachaDrawResult("icon_001", true, 2));
+        assertThat(result.results().get(9)).isEqualTo(new GachaDrawResult("icon_001", true, 10));
+        verify(playerIconRepository, times(1)).save(any(PlayerIcon.class));
+        verify(playerIconRepository, times(1)).findByPlayerIdAndIconId("p1", "icon_001");
+    }
+
+    @Test
+    void 십연차는_업적용_이벤트를_10번_발행한다() {
+        player.addGold(2000);
+
+        service(0.0).draw("p1", 10);
+
+        verify(eventPublisher, times(10)).publishEvent(new GachaDrawnEvent("p1", "icon_001"));
+    }
+
+    @Test
+    void 십연차_골드가_부족하면_409이고_하나도_안_뽑는다() {
+        player.addGold(1999);
+
+        assertThatThrownBy(() -> service(0.0).draw("p1", 10))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("code", "NOT_ENOUGH_GOLD");
+        assertThat(player.getGold()).isEqualTo(1999);
+        verifyNoInteractions(playerIconRepository);
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    void 뽑기_횟수는_1과_10만_허용한다() {
+        player.addGold(10000);
+
+        for (int times : new int[]{0, 2, 5, 11, -1}) {
+            assertThatThrownBy(() -> service(0.0).draw("p1", times))
+                    .isInstanceOf(InvalidRequestException.class)
+                    .hasFieldOrPropertyWithValue("code", "INVALID_DRAW_COUNT");
+        }
+        assertThat(player.getGold()).isEqualTo(10000);
+    }
+
+    @Test
+    void 일회_뽑기_응답의_첫_결과는_예전_필드와_같다() {
+        player.addGold(200);
+
+        GachaResultResponse result = service(0.0).draw("p1", 1);
+
+        assertThat(result.results()).containsExactly(new GachaDrawResult("icon_001", false, 1));
+        assertThat(result.iconId()).isEqualTo("icon_001");
+        assertThat(result.price()).isEqualTo(GachaService.PRICE);
     }
 }
