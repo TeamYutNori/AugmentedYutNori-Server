@@ -43,9 +43,9 @@ class MatchRecordServiceTest {
     @Test
     void record() {
         GameFinishedEvent event = new GameFinishedEvent("ROOM1", 0, GameEndReason.FINISHED, List.of(
-                new RankingEntry("p0", 0, 1, 500),
-                new RankingEntry("p1", 1, 2, 400),
-                new RankingEntry("p2", 2, 3, 0)),
+                new RankingEntry("p0", 0, 1, 500, false),
+                new RankingEntry("p1", 1, 2, 400, false),
+                new RankingEntry("p2", 2, 3, 0, true)),
                 Set.of("p2"));
 
         MatchResult saved = service.record(event);

@@ -28,8 +28,9 @@ public final class WsMessages {
     public record PlayerRemovedMessage(String playerId, int team, GameEndReason reason) {}
 
     // 게임 결과 한 줄 (플레이어 = 팀). rank는 이번 판 등수(1부터, 같은 등수 다음은 건너뜀)
-    // 기권·끊김으로 나간 플레이어는 꼴찌 등수 + rewardGold 0
-    public record RankingEntry(String playerId, int team, int rank, int rewardGold) {}
+    // 기권·끊김으로 나간 플레이어는 꼴찌 등수 + rewardGold 0 + leftGame true
+    // 남아 있어도 rewardGold가 0일 수 있다 (보상 인원 1명 이하 등). 나갔는지는 leftGame으로 판단할 것
+    public record RankingEntry(String playerId, int team, int rank, int rewardGold, boolean leftGame) {}
 
     // rankings: 이번 판 등수 목록. 순위 계산·끊김 처리가 채운다
     public record GameEndedMessage(int winnerTeam, GameEndReason reason, List<RankingEntry> rankings) {

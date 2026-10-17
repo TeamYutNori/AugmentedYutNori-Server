@@ -44,6 +44,7 @@ public class GameSession {
 
     // ── 퇴장 ──
     private final Set<Integer> removedTeams = new LinkedHashSet<>();   // 나간 팀 (나간 순서대로)
+    private final Map<Integer, Integer> removedAtTurn = new HashMap<>(); // 나간 팀 → 나간 순간의 turnNumber (보상 인원 계산용)
 
     // ── 자동 진행 ──
     private final Set<Integer> autoTeams = new HashSet<>();   // 연결이 끊겨 서버가 대신 두는 팀
@@ -94,7 +95,15 @@ public class GameSession {
 
     // ── 퇴장 ──
     public boolean isRemoved(int team) { return removedTeams.contains(team); }
-    public void markRemoved(int team)  { removedTeams.add(team); }
+    // 나간 순간의 턴 번호도 함께 기록한다 (증강 선택 중이면 0). 이미 나간 팀이면 처음 기록을 유지
+    public void markRemoved(int team) {
+        if (removedTeams.add(team)) removedAtTurn.put(team, turnNumber);
+    }
+    // 나간 팀이 나간 턴 번호. 안 나간 팀이면 빈 값
+    public OptionalInt removedAtTurn(int team) {
+        Integer turn = removedAtTurn.get(team);
+        return turn == null ? OptionalInt.empty() : OptionalInt.of(turn);
+    }
 
     // ── 자동 진행 (끊김 → 켬, 재접속 → 끔) ──
     public boolean isAuto(int team) { return autoTeams.contains(team); }

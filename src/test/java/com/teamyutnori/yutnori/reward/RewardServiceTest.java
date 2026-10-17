@@ -38,9 +38,9 @@ class RewardServiceTest {
     @Test
     void 순위대로_골드를_지급한다() {
         List<RankingEntry> rankings = List.of(
-                policy.entry("p1", 0, 1, false),
-                policy.entry("p2", 1, 2, false),
-                policy.entry("p3", 2, 3, true));   // 나간 플레이어
+                policy.entry("p1", 0, 1, false, 4),
+                policy.entry("p2", 1, 2, false, 4),
+                policy.entry("p3", 2, 3, true, 4));   // 나간 플레이어
 
         int total = rewardService.grant(rankings);
 
@@ -55,7 +55,7 @@ class RewardServiceTest {
     void 기존_골드에_더한다() {
         first.addGold(1000);
 
-        rewardService.grant(List.of(policy.entry("p1", 0, 1, false)));
+        rewardService.grant(List.of(policy.entry("p1", 0, 1, false, 4)));
 
         assertThat(first.getGold()).isEqualTo(1500);
     }
@@ -65,8 +65,8 @@ class RewardServiceTest {
         when(playerRepository.findByPlayerId("ghost")).thenReturn(Optional.empty());
 
         int total = rewardService.grant(List.of(
-                policy.entry("ghost", 0, 1, false),
-                policy.entry("p2", 1, 2, false)));
+                policy.entry("ghost", 0, 1, false, 4),
+                policy.entry("p2", 1, 2, false, 4)));
 
         assertThat(second.getGold()).isEqualTo(400);
         assertThat(total).isEqualTo(400);

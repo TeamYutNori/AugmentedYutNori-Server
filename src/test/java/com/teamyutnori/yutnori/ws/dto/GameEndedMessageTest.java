@@ -20,13 +20,13 @@ class GameEndedMessageTest {
     @Test
     void 순위_목록이_클라와_같은_필드_이름으로_나간다() {
         GameEndedMessage message = new GameEndedMessage(0, GameEndReason.FINISHED, List.of(
-                new RankingEntry("p1", 0, 1, 500),
-                new RankingEntry("p2", 1, 2, 400)));
+                new RankingEntry("p1", 0, 1, 500, false),
+                new RankingEntry("p2", 1, 2, 400, false)));
 
         JsonNode expected = objectMapper.readTree("""
                 {"winnerTeam":0,"reason":"FINISHED","rankings":[
-                  {"playerId":"p1","team":0,"rank":1,"rewardGold":500},
-                  {"playerId":"p2","team":1,"rank":2,"rewardGold":400}]}""");
+                  {"playerId":"p1","team":0,"rank":1,"rewardGold":500,"leftGame":false},
+                  {"playerId":"p2","team":1,"rank":2,"rewardGold":400,"leftGame":false}]}""");
         assertEquals(expected, objectMapper.valueToTree(message));
     }
 

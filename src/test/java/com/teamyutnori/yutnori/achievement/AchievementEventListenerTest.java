@@ -28,9 +28,9 @@ class AchievementEventListenerTest {
     @Test
     void 게임이_끝나면_남은_사람만_플레이_횟수_1등은_1등_횟수도() {
         listener.onGameFinished(new GameFinishedEvent("ROOM", 0, GameEndReason.FINISHED, List.of(
-                new RankingEntry("p0", 0, 1, 500),
-                new RankingEntry("p1", 1, 2, 400),
-                new RankingEntry("p2", 2, 3, 0)), Set.of("p2")));
+                new RankingEntry("p0", 0, 1, 500, false),
+                new RankingEntry("p1", 1, 2, 400, false),
+                new RankingEntry("p2", 2, 3, 0, true)), Set.of("p2")));
 
         verify(service).record("p0", AchievementStat.GAMES_PLAYED);
         verify(service).record("p0", AchievementStat.FIRST_PLACES);
@@ -44,8 +44,8 @@ class AchievementEventListenerTest {
         doThrow(new RuntimeException("db")).when(service).record("p0", AchievementStat.GAMES_PLAYED);
 
         listener.onGameFinished(new GameFinishedEvent("ROOM", 0, GameEndReason.FINISHED, List.of(
-                new RankingEntry("p0", 0, 1, 500),
-                new RankingEntry("p1", 1, 2, 400)), Set.of()));
+                new RankingEntry("p0", 0, 1, 500, false),
+                new RankingEntry("p1", 1, 2, 400, false)), Set.of()));
 
         verify(service).record("p1", AchievementStat.GAMES_PLAYED);
     }

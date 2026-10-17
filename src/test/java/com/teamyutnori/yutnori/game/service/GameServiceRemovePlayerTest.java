@@ -109,8 +109,10 @@ class GameServiceRemovePlayerTest {
     }
 
     // 1명만 남으면 PLAYER_REMOVED → GAME_ENDED 순서로 보내고, 남은 사람이 1등
+    // 기준 턴 뒤에 나갔으니 보상 인원은 3명 그대로 → 3인 표 1등 400
     @Test
     void lastOneStandingEndsGame() {
+        session.setTurnNumber(5);
         service.leaveGame(ROOM, "p1");
         service.removePlayer(ROOM, "p2");
 
@@ -124,8 +126,36 @@ class GameServiceRemovePlayerTest {
         assertThat(ended.reason()).isEqualTo(GameEndReason.DISCONNECTED);
         assertThat(ended.rankings()).extracting(RankingEntry::playerId).containsExactly("p0", "p1", "p2");
         assertThat(ended.rankings()).extracting(RankingEntry::rank).containsExactly(1, 2, 2);
-        assertThat(ended.rankings()).extracting(RankingEntry::rewardGold).containsExactly(500, 0, 0);
+        assertThat(ended.rankings()).extracting(RankingEntry::rewardGold).containsExactly(400, 0, 0);
         assertThat(session.getPhase()).isEqualTo(GamePhase.ENDED);
+    }
+
+    // 기준 턴 안에 둘 다 나가면 보상 인원 1명 → 남은 사람도 0골드 (파밍 방지)
+    @Test
+    void everyoneLeftEarlyGivesNoReward() {
+        session.setTurnNumber(1);
+        service.leaveGame(ROOM, "p1");
+        service.removePlayer(ROOM, "p2");
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(broadcaster).broadcast(eq(ROOM), eq(MessageType.GAME_ENDED), captor.capture());
+        GameEndedMessage ended = (GameEndedMessage) captor.getValue();
+        assertThat(ended.rankings()).extracting(RankingEntry::rank).containsExactly(1, 2, 2);
+        assertThat(ended.rankings()).extracting(RankingEntry::rewardGold).containsExactly(0, 0, 0);
+        assertThat(ended.rankings()).extracting(RankingEntry::leftGame).containsExactly(false, true, true);   // 남은 1등은 0골드여도 나간 게 아님
+    }
+
+    // 나가기와 끊김(30초 후 제거) 모두 나간 턴을 기록한다
+    @Test
+    void leaveAndDisconnectRecordRemovedTurn() {
+        session.setTurnNumber(3);
+        service.leaveGame(ROOM, "p1");
+        session.setTurnNumber(4);
+        service.removePlayer(ROOM, "p2");
+
+        assertThat(session.removedAtTurn(1)).hasValue(3);
+        assertThat(session.removedAtTurn(2)).hasValue(4);
+        assertThat(session.removedAtTurn(0)).isEmpty();
     }
 
     // 종료 시 rankings 그대로 골드 지급 + 종료 이벤트 발행
