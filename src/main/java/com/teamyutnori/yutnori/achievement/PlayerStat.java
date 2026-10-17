@@ -69,10 +69,16 @@ public class PlayerStat {
 
     // LOGIN_DAYS 외 횟수 +1 (접속은 recordLogin으로)
     public void increment(AchievementStat stat) {
+        increment(stat, 1);
+    }
+
+    // 한 번에 amount만큼 올린다 (10연차 뽑기 등)
+    public void increment(AchievementStat stat, int amount) {
+        if (amount <= 0) throw new IllegalArgumentException("올릴 횟수는 1 이상이어야 합니다: " + amount);
         switch (stat) {
-            case GAMES_PLAYED -> gamesPlayed = Math.addExact(gamesPlayed, 1);
-            case GACHA_DRAWS -> gachaDraws = Math.addExact(gachaDraws, 1);
-            case FIRST_PLACES -> firstPlaces = Math.addExact(firstPlaces, 1);
+            case GAMES_PLAYED -> gamesPlayed = Math.addExact(gamesPlayed, amount);
+            case GACHA_DRAWS -> gachaDraws = Math.addExact(gachaDraws, amount);
+            case FIRST_PLACES -> firstPlaces = Math.addExact(firstPlaces, amount);
             case LOGIN_DAYS -> throw new IllegalArgumentException("접속 횟수는 recordLogin으로 올립니다.");
         }
     }

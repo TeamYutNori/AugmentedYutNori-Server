@@ -52,8 +52,14 @@ public class AchievementService {
     // 횟수 +1 후 기준을 넘은 업적 달성 처리
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(String playerId, AchievementStat which) {
+        record(playerId, which, 1);
+    }
+
+    // 횟수 +amount 후 기준을 넘은 업적 달성 처리 (10연차 뽑기는 한 번에 +10)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void record(String playerId, AchievementStat which, int amount) {
         PlayerStat stat = statOf(playerId);
-        stat.increment(which);
+        stat.increment(which, amount);
         unlock(playerId, stat, which);
     }
 

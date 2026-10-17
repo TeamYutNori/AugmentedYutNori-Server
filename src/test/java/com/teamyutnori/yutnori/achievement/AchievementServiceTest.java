@@ -90,6 +90,14 @@ class AchievementServiceTest {
     }
 
     @Test
+    void 한_번에_여러_횟수를_올리면_넘은_업적을_모두_달성한다() {
+        service().record("p1", AchievementStat.GAMES_PLAYED, 10);   // 10연차 뽑기처럼 한 번에 +10
+
+        assertThat(records).extracting(PlayerAchievement::getAchievementId).containsExactly("games_1", "games_2");
+        assertThat(stats.get(0).get(AchievementStat.GAMES_PLAYED)).isEqualTo(10);
+    }
+
+    @Test
     void 접속은_하루_한_번만_센다() {
         service().recordLogin("p1");
         service().recordLogin("p1");

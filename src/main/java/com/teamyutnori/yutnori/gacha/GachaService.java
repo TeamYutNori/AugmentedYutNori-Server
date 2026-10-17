@@ -6,7 +6,6 @@ import com.teamyutnori.yutnori.gacha.dto.GachaDrawResult;
 import com.teamyutnori.yutnori.gacha.dto.GachaResultResponse;
 import com.teamyutnori.yutnori.game.yut.RandomProvider;
 import com.teamyutnori.yutnori.icon.IconCatalog;
-import com.teamyutnori.yutnori.icon.IconDefinition;
 import com.teamyutnori.yutnori.icon.PlayerIcon;
 import com.teamyutnori.yutnori.icon.PlayerIconRepository;
 import com.teamyutnori.yutnori.player.entity.Player;
@@ -57,28 +56,34 @@ public class GachaService {
         int price = PRICE * times;
         player.spendGold(price);
 
-        // 같은 10연차 안에서 같은 아이콘이 또 나올 수 있어서, 이번에 다룬 보유 아이콘을 들고 다닌다
-        Map<String, PlayerIcon> touched = new HashMap<>();
-        List<GachaDrawResult> results = new ArrayList<>(times);
-        for (int i = 0; i < times; i++) {
-            IconDefinition picked = iconCatalog.pick(randomProvider);
-            PlayerIcon owned = touched.get(picked.id());
-            if (owned == null) {
-                owned = playerIconRepository.findByPlayerIdAndIconId(playerId, picked.id()).orElse(null);
-            }
+        // 먼저 N개를 다 뽑고, 보유 아이콘은 한 번에 조회한다 (10연차도 조회 쿼리 1번)
+        List<String> pickedIds = new ArrayList<>(times);
+        for (int i = 0; i < times; i++) pickedIds.add(iconCatalog.pick(randomProvider).id());
 
-            boolean duplicate = owned != null;
-            if (duplicate) {
-                owned.addDuplicate();
-            } else {
-                owned = playerIconRepository.save(PlayerIcon.first(playerId, picked.id()));
-            }
-            touched.put(picked.id(), owned);
-            results.add(new GachaDrawResult(picked.id(), duplicate, owned.getCount()));
-
-            // 업적(뽑기 횟수)용. 한 번 뽑을 때마다 1개 → 10연차면 +10. 이 트랜잭션이 커밋된 뒤에 집계된다
-            eventPublisher.publishEvent(new GachaDrawnEvent(playerId, picked.id()));
+        Map<String, PlayerIcon> owned = new HashMap<>();
+        for (PlayerIcon icon : playerIconRepository.findAllByPlayerIdAndIconIdIn(playerId, Set.copyOf(pickedIds))) {
+            owned.put(icon.getIconId(), icon);
         }
+
+        // 같은 10연차 안에서 같은 아이콘이 또 나오면 두 번째부터 중복 (owned에 넣어 두므로)
+        List<PlayerIcon> created = new ArrayList<>();
+        List<GachaDrawResult> results = new ArrayList<>(times);
+        for (String iconId : pickedIds) {
+            PlayerIcon icon = owned.get(iconId);
+            boolean duplicate = icon != null;
+            if (duplicate) {
+                icon.addDuplicate();
+            } else {
+                icon = PlayerIcon.first(playerId, iconId);
+                owned.put(iconId, icon);
+                created.add(icon);
+            }
+            results.add(new GachaDrawResult(iconId, duplicate, icon.getCount()));
+        }
+        playerIconRepository.saveAll(created);
+
+        // 업적(뽑기 횟수)용. 요청당 1개만 발행하고 횟수를 담는다 → 10연차도 집계 1번. 이 트랜잭션이 커밋된 뒤에 집계된다
+        eventPublisher.publishEvent(new GachaDrawnEvent(playerId, times));
 
         return GachaResultResponse.of(results, player.getGold(), price);
     }

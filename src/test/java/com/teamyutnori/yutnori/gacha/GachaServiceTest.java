@@ -16,11 +16,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class GachaServiceTest {
@@ -37,7 +41,15 @@ class GachaServiceTest {
         playerIconRepository = mock(PlayerIconRepository.class);
         player = Player.createFirebase("p1", "uid-1", "a@example.com");
         when(playerRepository.findByPlayerId("p1")).thenReturn(Optional.of(player));
-        when(playerIconRepository.save(any(PlayerIcon.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    // saveAll에 넘긴 아이콘 id 목록이 정확히 이것인지
+    private static Iterable<PlayerIcon> savedIconIds(String... iconIds) {
+        return argThat(icons -> {
+            List<String> ids = new ArrayList<>();
+            icons.forEach(icon -> ids.add(icon.getIconId()));
+            return ids.equals(List.of(iconIds));
+        });
     }
 
     // 0.0이면 첫 번째(icon_001), 0.99면 마지막(icon_022)
@@ -58,7 +70,7 @@ class GachaServiceTest {
         assertThat(result.gold()).isEqualTo(300);
         assertThat(result.price()).isEqualTo(GachaService.PRICE);
         assertThat(player.getGold()).isEqualTo(300);
-        verify(playerIconRepository).save(any(PlayerIcon.class));
+        verify(playerIconRepository).saveAll(savedIconIds("icon_001"));
     }
 
     @Test
@@ -67,14 +79,14 @@ class GachaServiceTest {
 
         service(0.0).draw("p1");
 
-        verify(eventPublisher).publishEvent(new GachaDrawnEvent("p1", "icon_001"));
+        verify(eventPublisher).publishEvent(new GachaDrawnEvent("p1", 1));
     }
 
     @Test
     void 가진_아이콘이_또_나오면_count만_올리고_보상은_없다() {
         player.addGold(200);
         PlayerIcon owned = PlayerIcon.first("p1", "icon_022");
-        when(playerIconRepository.findByPlayerIdAndIconId("p1", "icon_022")).thenReturn(Optional.of(owned));
+        when(playerIconRepository.findAllByPlayerIdAndIconIdIn(eq("p1"), any())).thenReturn(List.of(owned));
 
         GachaResultResponse result = service(0.99).draw("p1");
 
@@ -82,7 +94,7 @@ class GachaServiceTest {
         assertThat(result.duplicate()).isTrue();
         assertThat(result.count()).isEqualTo(2);
         assertThat(result.gold()).isZero();
-        verify(playerIconRepository, never()).save(any());
+        verify(playerIconRepository).saveAll(savedIconIds());   // 새로 저장할 것 없음
     }
 
     @Test
@@ -127,17 +139,18 @@ class GachaServiceTest {
         assertThat(result.results().get(0)).isEqualTo(new GachaDrawResult("icon_001", false, 1));
         assertThat(result.results().get(1)).isEqualTo(new GachaDrawResult("icon_001", true, 2));
         assertThat(result.results().get(9)).isEqualTo(new GachaDrawResult("icon_001", true, 10));
-        verify(playerIconRepository, times(1)).save(any(PlayerIcon.class));
-        verify(playerIconRepository, times(1)).findByPlayerIdAndIconId("p1", "icon_001");
+        verify(playerIconRepository, times(1)).saveAll(savedIconIds("icon_001"));
+        verify(playerIconRepository, times(1)).findAllByPlayerIdAndIconIdIn(eq("p1"), any());   // 조회는 한 번
     }
 
     @Test
-    void 십연차는_업적용_이벤트를_10번_발행한다() {
+    void 십연차는_업적용_이벤트를_한_번만_횟수_10으로_발행한다() {
         player.addGold(2000);
 
         service(0.0).draw("p1", 10);
 
-        verify(eventPublisher, times(10)).publishEvent(new GachaDrawnEvent("p1", "icon_001"));
+        verify(eventPublisher).publishEvent(new GachaDrawnEvent("p1", 10));
+        verifyNoMoreInteractions(eventPublisher);
     }
 
     @Test

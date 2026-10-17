@@ -53,10 +53,10 @@ class AchievementEventListenerTest {
     @Test
     void 접속과_뽑기() {
         listener.onLoggedIn(new PlayerLoggedInEvent("p0"));
-        listener.onGachaDrawn(new GachaDrawnEvent("p0", "icon_001"));
+        listener.onGachaDrawn(new GachaDrawnEvent("p0", 10));
 
         verify(service).recordLogin("p0");
-        verify(service).record("p0", AchievementStat.GACHA_DRAWS);
+        verify(service).record("p0", AchievementStat.GACHA_DRAWS, 10);   // 10연차는 한 번에 +10
     }
 
     @Test
