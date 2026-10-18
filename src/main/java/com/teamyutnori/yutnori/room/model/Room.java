@@ -1,10 +1,15 @@
 package com.teamyutnori.yutnori.room.model;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Getter
 public class Room {
@@ -24,6 +29,10 @@ public class Room {
     private final List<RoomMember> members;
     // 현재 방장 playerId
     private String hostPlayerId;
+    // 빠른 참가로 잡아 둔 자리: 예약 키(playerId, 모르면 "anon:" + 임의값) → 만료 시각
+    // 빠른 참가 응답 ~ JOIN_ROOM 사이에 다른 사람이 자리를 가져가지 않게 한다. 방 단위 synchronized 안에서만 다룬다
+    @Getter(AccessLevel.NONE)
+    private final Map<String, Instant> reservations = new LinkedHashMap<>();
 
     public Room(
             String code,
@@ -94,6 +103,51 @@ public class Room {
     // 방이 가득 찼는지 확인
     public boolean isFull() {
         return members.size() >= maxPlayers;
+    }
+
+    // ── 빠른 참가 자리 예약 ──
+
+    public static final String ANONYMOUS_PREFIX = "anon:";
+
+    // 빠른 참가로 자리 하나를 잡아 둔다. expiresAt까지 JOIN_ROOM이 오지 않으면 자리는 다시 풀린다
+    // 같은 키로 다시 잡으면 만료 시각만 늘어난다 (자리를 두 개 차지하지 않음)
+    public void reserveSeat(String key, Instant expiresAt) {
+        reservations.put(key, expiresAt);
+    }
+
+    // 아직 유효한 예약 수 (만료된 예약은 이때 정리)
+    public int reservedSeats(Instant now) {
+        reservations.values().removeIf(expiresAt -> !expiresAt.isAfter(now));
+        return reservations.size();
+    }
+
+    public boolean hasReservation(String key, Instant now) {
+        reservedSeats(now);
+        return reservations.containsKey(key);
+    }
+
+    // 참가자 + 예약을 합쳐도 자리가 남는지. 빠른 참가 방 고르기와 예약 없는 참가에 쓴다
+    public boolean hasFreeSeat(Instant now) {
+        return members.size() + reservedSeats(now) < maxPlayers;
+    }
+
+    // 참가할 때 자기 예약을 쓴다. 자기 예약이 있었으면 true
+    public boolean takeReservation(String playerId, Instant now) {
+        reservedSeats(now);
+        return reservations.remove(playerId) != null;
+    }
+
+    // 누구 것인지 모르는 예약(토큰 없이 빠른 참가한 경우) 하나를 쓴다. 있었으면 true
+    public boolean takeAnonymousReservation(Instant now) {
+        reservedSeats(now);
+        Iterator<String> keys = reservations.keySet().iterator();
+        while (keys.hasNext()) {
+            if (keys.next().startsWith(ANONYMOUS_PREFIX)) {
+                keys.remove();
+                return true;
+            }
+        }
+        return false;
     }
 
     // 외부에서 참가자 목록 자체를 변경하지 못하도록 조회 전용으로 반환

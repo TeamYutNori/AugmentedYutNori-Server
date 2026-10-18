@@ -13,6 +13,8 @@ import com.teamyutnori.yutnori.room.repository.RoomRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -23,9 +25,20 @@ import java.util.function.Predicate;
 public class RoomService {
     private final RoomRepository roomRepository;
     private final GameService gameService;
+    private final Clock clock;
 
     // 새로운 방을 생성하고 메모리 저장소에 등록
     public RoomSummaryResponse createRoom(CreateRoomRequest request) {
+        // 외부 응답용 DTO로 변환해서 반환
+        return RoomSummaryResponse.from(createAndSave(request, null, null));
+    }
+
+    // 빠른 참가용 새 방: 만든 사람 자리를 저장 전에 예약해 둔다 (저장 직후 다른 빠른 참가가 자리를 가져가지 않도록)
+    public Room createRoomWithReservation(CreateRoomRequest request, String reservationKey, Instant reservedUntil) {
+        return createAndSave(request, reservationKey, reservedUntil);
+    }
+
+    private Room createAndSave(CreateRoomRequest request, String reservationKey, Instant reservedUntil) {
         Room room;
 
         // 혹시 같은 방 코드가 생성되면 충돌하지 않도록 다시 생성
@@ -37,9 +50,9 @@ public class RoomService {
                     request.maxPlayers(),
                     request.timeLimit()
             );
+            if (reservationKey != null) room.reserveSeat(reservationKey, reservedUntil);
         } while (!roomRepository.saveIfAbsent(room));
-        // 외부 응답용 DTO로 변환해서 반환
-        return RoomSummaryResponse.from(room);
+        return room;
     }
 
     // 방 코드로 현재 방 정보를 조회
@@ -72,8 +85,16 @@ public class RoomService {
                 return room;
             }
 
+            // 빠른 참가로 잡아 둔 내 자리가 있으면 그 자리를 쓴다.
+            // 없으면 참가자 + 다른 사람들의 예약을 합쳐 자리가 남을 때만 참가.
+            // 그래도 없으면 누구 것인지 모르는 예약(토큰 없이 빠른 참가)을 하나 쓴다
+            Instant now = clock.instant();
+            boolean seated = room.takeReservation(playerId, now)
+                    || room.hasFreeSeat(now)
+                    || room.takeAnonymousReservation(now);
+
             // 최대 인원을 넘으면 참가 거부
-            if (room.isFull()) {
+            if (room.isFull() || !seated) {
                 throw new ConflictException(
                         "ROOM_FULL",
                         "방 인원이 가득 찼습니다."

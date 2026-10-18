@@ -52,9 +52,10 @@ export default function () {
   if (!check(p, { 'player created': (r) => r.status === 200 })) return;
   const token = p.json('guestToken');
 
-  // 2) 빠른 참가로 방 코드 받기
+  // 2) 빠른 참가로 방 코드 받기 (토큰을 보내면 서버가 내 이름으로 자리를 예약해 둔다)
   const q = http.post(`${BASE}/rooms/quick-join`,
-    JSON.stringify({ isPublic: true, maxPlayers: 4, timeLimit: 30 }), json);
+    JSON.stringify({ isPublic: true, maxPlayers: 4, timeLimit: 30 }),
+    { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } });
   if (!check(q, { 'room joined (REST)': (r) => r.status === 200 })) return;
   const code = q.json('code');
 

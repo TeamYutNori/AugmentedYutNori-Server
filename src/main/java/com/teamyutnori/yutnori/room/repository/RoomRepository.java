@@ -4,6 +4,7 @@ import com.teamyutnori.yutnori.room.model.Room;
 import com.teamyutnori.yutnori.room.model.RoomStatus;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -47,13 +48,13 @@ public class RoomRepository {
                         .anyMatch(member -> member.getPlayerId().equals(playerId)));
     }
 
-    // 빠른 참가가 가능한 공개 대기방 조회
-    public Optional<Room> findJoinableRoom() {
+    // 빠른 참가 후보: 공개 대기방 목록. 자리 여부는 예약까지 따져야 해서 MatchmakingService가 방을 잠근 뒤 확인한다
+    public List<Room> findWaitingPublicRooms() {
         return rooms.values()
                 .stream()
                 .filter(Room::isPublic)
                 .filter(room -> room.getStatus() == RoomStatus.WAITING)
                 .filter(room -> !room.isFull())
-                .findFirst();
+                .toList();
     }
 }
