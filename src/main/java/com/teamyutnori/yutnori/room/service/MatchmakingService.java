@@ -38,6 +38,8 @@ public class MatchmakingService {
         for (Room room : roomRepository.findWaitingPublicRooms()) {
             synchronized (room) {   // joinRoom과 같은 잠금. 확인과 예약 사이에 다른 요청이 끼지 않는다
                 if (room.getStatus() != RoomStatus.WAITING) continue;
+                // 목록을 받은 뒤 마지막 사람이 나가 방이 지워졌을 수 있다 (지우기도 같은 잠금 안에서 일어난다)
+                if (roomRepository.findByCode(room.getCode()).orElse(null) != room) continue;
                 // 이미 이 방에 들어가 있거나 자리를 잡아 둔 플레이어가 다시 누르면 같은 방을 준다
                 if (playerId != null && room.containsMember(playerId)) {
                     return RoomSummaryResponse.from(room);

@@ -22,7 +22,10 @@ const STAY_SEC = Number(__ENV.STAY || 30);
 // 직접 만든 측정값
 const pingRtt = new Trend('ws_ping_rtt', true);        // PING → PONG 왕복 시간
 const joinTime = new Trend('ws_join_time', true);      // 접속 → 첫 ROOM_STATE 까지
-const wsErrors = new Counter('ws_errors');             // 서버가 보낸 ERROR 메시지 수
+const wsErrors = new Counter('ws_errors');             // 서버가 보낸 ERROR 메시지 수 (전체)
+const wsRoomFull = new Counter('ws_error_room_full');  // 그중 ROOM_FULL (빠른 참가 자리 겹침)
+const wsRoomGone = new Counter('ws_error_room_not_found'); // 그중 ROOM_NOT_FOUND (받은 방이 그새 지워짐)
+const wsHandshakeFail = new Counter('ws_handshake_failed'); // WebSocket 접속 자체 실패 (서버 대기열 초과 등)
 const joinOk = new Rate('ws_join_success');            // 방 참가 성공률
 
 // 부하 단계: 0 → 50명(1분) → 50명 유지(2분) → 200명(1분) → 200명 유지(2분) → 0
@@ -87,12 +90,16 @@ export default function () {
         pingRtt.add(Date.now() - msg.payload.clientTime);
       } else if (msg.type === 'ERROR') {
         wsErrors.add(1);
+        const code = msg.payload && msg.payload.code;
+        if (code === 'ROOM_FULL') wsRoomFull.add(1);
+        else if (code === 'ROOM_NOT_FOUND') wsRoomGone.add(1);
       }
     });
 
     socket.on('error', () => wsErrors.add(1));
   });
 
-  check(res, { 'ws handshake 101': (r) => r && r.status === 101 });
+  const handshakeOk = check(res, { 'ws handshake 101': (r) => r && r.status === 101 });
+  if (!handshakeOk) wsHandshakeFail.add(1);
   joinOk.add(joined);
 }

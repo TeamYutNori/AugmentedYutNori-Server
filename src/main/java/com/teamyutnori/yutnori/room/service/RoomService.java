@@ -234,7 +234,8 @@ public class RoomService {
             room.removeMember(playerId);
 
             // 마지막 플레이어가 나가면 빈 방은 저장소에서 제거
-            if (room.getCurrentPlayers() == 0) {
+            // 단, 빠른 참가로 자리를 잡고 들어오는 중인 사람이 있으면 남겨 둔다 (지우면 그 사람은 방을 찾지 못함)
+            if (room.getCurrentPlayers() == 0 && room.reservedSeats(clock.instant()) == 0) {
                 roomRepository.delete(roomCode);
                 // 방이 완전히 비면 게임 세션도 같이 정리
                 gameService.removeGame(roomCode);

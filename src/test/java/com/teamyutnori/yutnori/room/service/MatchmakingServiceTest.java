@@ -93,6 +93,18 @@ class MatchmakingServiceTest {
     }
 
     @Test
+    @DisplayName("마지막 사람이 나가도 들어오는 중인 예약이 있으면 방을 지우지 않는다")
+    void roomKeptWhileReservationPending() {
+        String code = matchmaking.quickJoin(QUICK4, "a").code();
+        roomService.joinRoom(code, "a", "a", null);
+        matchmaking.quickJoin(QUICK4, "b");                       // b는 자리만 잡고 아직 안 들어옴
+        roomService.leaveRoom(code, "a");                         // 마지막 참가자 퇴장
+
+        roomService.joinRoom(code, "b", "b", null);               // 방이 남아 있어 들어갈 수 있다
+        assertEquals(1, roomService.getRoomOrThrow(code).getCurrentPlayers());
+    }
+
+    @Test
     @DisplayName("토큰 없이 잡은 익명 예약은 참가하는 사람이 대신 쓴다 (예전 클라이언트 호환)")
     void anonymousReservationUsedOnJoin() {
         String code = matchmaking.quickJoin(QUICK2, null).code();
