@@ -54,6 +54,7 @@ export default function () {
   const p = http.post(`${BASE}/players`, JSON.stringify({ nickname }), json);
   if (!check(p, { 'player created': (r) => r.status === 200 })) return;
   const token = p.json('guestToken');
+  const myId = p.json('playerId');
 
   // 2) 빠른 참가로 방 코드 받기 (토큰을 보내면 서버가 내 이름으로 자리를 예약해 둔다)
   const q = http.post(`${BASE}/rooms/quick-join`,
@@ -83,7 +84,9 @@ export default function () {
 
     socket.on('message', (raw) => {
       const msg = JSON.parse(raw);
-      if (msg.type === 'ROOM_STATE' && !joined) {
+      // 같은 방 주소로 붙은 사람은 남의 ROOM_STATE도 받으므로, 참가자 목록에 내가 있을 때만 참가 성공으로 센다
+      if (msg.type === 'ROOM_STATE' && !joined &&
+          (msg.payload.members || []).some((m) => m.playerId === myId)) {
         joined = true;
         joinTime.add(Date.now() - opened);
       } else if (msg.type === 'PONG') {
