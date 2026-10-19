@@ -112,7 +112,7 @@ class GameServiceRemovePlayerTest {
     // 기준 턴 뒤에 나갔으니 보상 인원은 3명 그대로 → 3인 표 1등 400
     @Test
     void lastOneStandingEndsGame() {
-        session.setTurnNumber(5);
+        session.setRoundNumber(2);
         service.leaveGame(ROOM, "p1");
         service.removePlayer(ROOM, "p2");
 
@@ -133,7 +133,7 @@ class GameServiceRemovePlayerTest {
     // 기준 턴 안에 둘 다 나가면 보상 인원 1명 → 남은 사람도 0골드 (파밍 방지)
     @Test
     void everyoneLeftEarlyGivesNoReward() {
-        session.setTurnNumber(1);
+        session.setRoundNumber(1);
         service.leaveGame(ROOM, "p1");
         service.removePlayer(ROOM, "p2");
 
@@ -148,14 +148,14 @@ class GameServiceRemovePlayerTest {
     // 나가기와 끊김(30초 후 제거) 모두 나간 턴을 기록한다
     @Test
     void leaveAndDisconnectRecordRemovedTurn() {
-        session.setTurnNumber(3);
+        session.setRoundNumber(1);
         service.leaveGame(ROOM, "p1");
-        session.setTurnNumber(4);
+        session.setRoundNumber(2);
         service.removePlayer(ROOM, "p2");
 
-        assertThat(session.removedAtTurn(1)).hasValue(3);
-        assertThat(session.removedAtTurn(2)).hasValue(4);
-        assertThat(session.removedAtTurn(0)).isEmpty();
+        assertThat(session.removedAtRound(1)).hasValue(1);
+        assertThat(session.removedAtRound(2)).hasValue(2);
+        assertThat(session.removedAtRound(0)).isEmpty();
     }
 
     // 종료 시 rankings 그대로 골드 지급 + 종료 이벤트 발행

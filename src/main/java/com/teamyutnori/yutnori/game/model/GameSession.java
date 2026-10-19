@@ -30,6 +30,9 @@ public class GameSession {
     // 턴 번호. 새 턴이 시작될 때마다 1씩 증가 (TurnManager가 관리, 첫 턴 = 1)
     // 턴 타이머가 "자기가 시작된 턴"에만 동작하게 하는 표식으로 쓴다
     @Setter private int turnNumber = 0;
+    // 라운드 번호. 모든 플레이어가 한 번씩 차례를 돌면 1 증가 (TurnManager가 관리, 첫 턴 = 1, 증강 선택 중 = 0)
+    // 남은 사람이 줄면 한 바퀴도 짧아진다. 보상 인원 계산(기준 라운드 전 이탈)에 쓴다
+    @Setter private int roundNumber = 0;
 
     // ── 윷 결과 ──
     private final List<YutResult> storedResults = new ArrayList<>(); // 던졌지만 아직 이동에 안 쓴 결과
@@ -44,7 +47,7 @@ public class GameSession {
 
     // ── 퇴장 ──
     private final Set<Integer> removedTeams = new LinkedHashSet<>();   // 나간 팀 (나간 순서대로)
-    private final Map<Integer, Integer> removedAtTurn = new HashMap<>(); // 나간 팀 → 나간 순간의 turnNumber (보상 인원 계산용)
+    private final Map<Integer, Integer> removedAtRound = new HashMap<>(); // 나간 팀 → 나간 순간의 roundNumber (보상 인원 계산용)
 
     // ── 자동 진행 ──
     private final Set<Integer> autoTeams = new HashSet<>();   // 연결이 끊겨 서버가 대신 두는 팀
@@ -95,14 +98,14 @@ public class GameSession {
 
     // ── 퇴장 ──
     public boolean isRemoved(int team) { return removedTeams.contains(team); }
-    // 나간 순간의 턴 번호도 함께 기록한다 (증강 선택 중이면 0). 이미 나간 팀이면 처음 기록을 유지
+    // 나간 순간의 라운드 번호도 함께 기록한다 (증강 선택 중이면 0). 이미 나간 팀이면 처음 기록을 유지
     public void markRemoved(int team) {
-        if (removedTeams.add(team)) removedAtTurn.put(team, turnNumber);
+        if (removedTeams.add(team)) removedAtRound.put(team, roundNumber);
     }
-    // 나간 팀이 나간 턴 번호. 안 나간 팀이면 빈 값
-    public OptionalInt removedAtTurn(int team) {
-        Integer turn = removedAtTurn.get(team);
-        return turn == null ? OptionalInt.empty() : OptionalInt.of(turn);
+    // 나간 팀이 나간 라운드 번호. 안 나간 팀이면 빈 값
+    public OptionalInt removedAtRound(int team) {
+        Integer round = removedAtRound.get(team);
+        return round == null ? OptionalInt.empty() : OptionalInt.of(round);
     }
 
     // ── 자동 진행 (끊김 → 켬, 재접속 → 끔) ──

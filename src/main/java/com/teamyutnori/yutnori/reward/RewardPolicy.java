@@ -12,16 +12,17 @@ import java.util.Map;
 //     4인: 500 × 100/80/50/20%  →  500 / 400 / 250 / 100
 //     3인: 400 × 100/50/25%     →  400 / 200 / 100
 //     2인: 200 × 100/50%        →  200 / 100
-//   보상 인원 = 시작 인원 − 기준 턴(earlyLeaveTurns) 안에 나간 사람 수. 계산은 GameRanking.build
+//   보상 인원 = 시작 인원 − 기준 라운드(earlyLeaveRounds) 안에 나간 사람 수. 계산은 GameRanking.build
+//   라운드 = 남은 플레이어가 모두 한 번씩 차례를 도는 것 (GameSession.roundNumber, 첫 턴 = 1, 증강 선택 중 = 0)
 //   보상 인원이 1 이하면 남은 사람도 0 (2인전에서 상대가 일찍 나간 경우 등, 파밍 방지)
 //   같은 등수는 같은 금액, 기권·끊김으로 나간 플레이어는 0
 // rankings를 채우는 쪽은 entry(...)로 RankingEntry를 만들면 rewardGold가 같이 채워진다
 @Component
 public class RewardPolicy {
 
-    // 기준 턴 기본값. 이 턴 번호까지(증강 선택 중 포함) 나간 사람은 보상 인원에서 뺀다
-    // 지금은 테스트용으로 1 (첫 턴이 끝나기 전). application.properties의 reward.early-leave-turns로 바꾼다
-    public static final int DEFAULT_EARLY_LEAVE_TURNS = 1;
+    // 기준 라운드 기본값. 이 라운드가 끝나기 전에(증강 선택 중 포함) 나간 사람은 보상 인원에서 뺀다
+    // 지금은 테스트용으로 1 (첫 바퀴가 끝나기 전). application.properties의 reward.early-leave-rounds로 바꾼다
+    public static final int DEFAULT_EARLY_LEAVE_ROUNDS = 1;
 
     // 보상 인원 → 1등 금액과 등수별 비율(%). 비율 인덱스 0 = 1등. 비율이 없는 등수는 0
     private static final Map<Integer, Table> TABLES = Map.of(
@@ -31,25 +32,26 @@ public class RewardPolicy {
     );
     private static final int MAX_TABLE_PLAYERS = 4;
 
-    private final int earlyLeaveTurns;
+    private final int earlyLeaveRounds;
 
     public RewardPolicy() {
-        this(DEFAULT_EARLY_LEAVE_TURNS);
+        this(DEFAULT_EARLY_LEAVE_ROUNDS);
     }
 
     @Autowired
-    public RewardPolicy(@Value("${reward.early-leave-turns:" + DEFAULT_EARLY_LEAVE_TURNS + "}") int earlyLeaveTurns) {
-        if (earlyLeaveTurns < 0) throw new IllegalArgumentException("기준 턴은 0 이상이어야 합니다: " + earlyLeaveTurns);
-        this.earlyLeaveTurns = earlyLeaveTurns;
+    public RewardPolicy(@Value("${reward.early-leave-rounds:" + DEFAULT_EARLY_LEAVE_ROUNDS + "}") int earlyLeaveRounds) {
+        if (earlyLeaveRounds < 0) throw new IllegalArgumentException("기준 라운드는 0 이상이어야 합니다: " + earlyLeaveRounds);
+        this.earlyLeaveRounds = earlyLeaveRounds;
     }
 
-    // 이 턴 번호까지 나가면 '기준 전'에 나간 것 (GameSession.turnNumber 기준. 증강 선택 중은 0)
-    public int earlyLeaveTurns() {
-        return earlyLeaveTurns;
+    public int earlyLeaveRounds() {
+        return earlyLeaveRounds;
     }
 
-    public boolean isEarlyLeave(int removedAtTurn) {
-        return removedAtTurn <= earlyLeaveTurns;
+    // 나간 순간의 라운드 번호(GameSession.roundNumber, 증강 선택 중은 0)가 기준 라운드 이하면 '기준 전'에 나간 것
+    //  예) 기준 1: 증강 선택 중이나 첫 바퀴에 나가면 기준 전, 두 번째 바퀴부터는 기준 뒤
+    public boolean isEarlyLeave(int removedAtRound) {
+        return removedAtRound <= earlyLeaveRounds;
     }
 
     // 등수(1부터)와 보상 인원으로 받을 골드. 보상 인원 1 이하 또는 비율이 없는 등수는 0

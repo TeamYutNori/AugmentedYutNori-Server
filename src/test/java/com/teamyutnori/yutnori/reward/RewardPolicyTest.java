@@ -97,17 +97,17 @@ class RewardPolicyTest {
     }
 
     @Test
-    void 기준_턴_기본값은_1이고_그_턴까지_나가면_기준_전() {
-        assertThat(policy.earlyLeaveTurns()).isEqualTo(1);
+    void 기준_라운드_기본값은_1이고_첫_바퀴까지가_기준_전() {
+        assertThat(policy.earlyLeaveRounds()).isEqualTo(1);
         assertThat(policy.isEarlyLeave(0)).isTrue();    // 증강 선택 중
-        assertThat(policy.isEarlyLeave(1)).isTrue();    // 첫 턴 중
-        assertThat(policy.isEarlyLeave(2)).isFalse();   // 첫 턴이 끝난 뒤
+        assertThat(policy.isEarlyLeave(1)).isTrue();    // 첫 바퀴
+        assertThat(policy.isEarlyLeave(2)).isFalse();   // 두 번째 바퀴
     }
 
     @Test
-    void 기준_턴은_바꿀_수_있고_음수는_안_된다() {
-        assertThat(new RewardPolicy(10).isEarlyLeave(10)).isTrue();
-        assertThat(new RewardPolicy(10).isEarlyLeave(11)).isFalse();
+    void 기준_라운드는_바꿀_수_있고_음수는_안_된다() {
+        assertThat(new RewardPolicy(5).isEarlyLeave(5)).isTrue();
+        assertThat(new RewardPolicy(5).isEarlyLeave(6)).isFalse();
         assertThatThrownBy(() -> new RewardPolicy(-1)).isInstanceOf(IllegalArgumentException.class);
     }
 }

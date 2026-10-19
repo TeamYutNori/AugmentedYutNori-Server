@@ -26,6 +26,7 @@ public class TurnManager {
     // 증강 선택이 끝난 뒤 첫 턴 (나간 팀은 건너뜀)
     public void startFirstTurn(GameSession s) {
         s.setCurrentTeam(firstActiveFrom(s, 0));
+        s.setRoundNumber(1);
         resetTurn(s);
     }
 
@@ -108,7 +109,12 @@ public class TurnManager {
 
     // 다음 팀으로 (Unity NextTurn). 나간 팀은 건너뛴다
     public void nextTurn(GameSession s) {
-        s.setCurrentTeam(firstActiveFrom(s, s.getCurrentTeam() + 1));
+        int previous = s.getCurrentTeam();
+        int next = firstActiveFrom(s, previous + 1);
+        // 팀 번호가 앞쪽으로 돌아오면 남은 사람이 모두 한 번씩 한 것 → 다음 라운드
+        // (나간 팀은 건너뛰므로 남은 사람이 줄면 한 바퀴도 짧아진다)
+        if (next <= previous) s.setRoundNumber(s.getRoundNumber() + 1);
+        s.setCurrentTeam(next);
         resetTurn(s);
     }
 

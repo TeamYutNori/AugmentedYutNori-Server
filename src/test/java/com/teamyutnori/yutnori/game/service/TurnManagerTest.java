@@ -228,4 +228,31 @@ class TurnManagerTest {
         assertEquals(0, session.getCurrentTeam());
         assertEquals(3, session.getTurnNumber());
     }
+
+    @Test
+    @DisplayName("라운드: 첫 턴 1, 모두 한 번씩 하고 앞 팀으로 돌아오면 +1")
+    void roundAdvancesWhenOrderWraps() {
+        assertEquals(1, session.getRoundNumber());
+        turnManager.nextTurn(session);   // 팀 1
+        assertEquals(1, session.getRoundNumber());
+        turnManager.nextTurn(session);   // 다시 팀 0
+        assertEquals(2, session.getRoundNumber());
+    }
+
+    @Test
+    @DisplayName("라운드: 사람이 나가면 한 바퀴가 짧아진다 (4인에서 2명 나가면 2턴이 한 바퀴)")
+    void roundShrinksWhenTeamsLeave() {
+        GameSession four = new GameSession("ROOM4", new GameSetup(4, 2, "default", false),
+                Map.of("a", 0, "b", 1, "c", 2, "d", 3), TestBoards.defaultBoard()).createPieces();
+        turnManager.startFirstTurn(four);       // 팀 0, 1라운드
+        four.markRemoved(1);
+        four.markRemoved(2);
+        turnManager.nextTurn(four);             // 팀 3, 1라운드
+        assertEquals(3, four.getCurrentTeam());
+        assertEquals(1, four.getRoundNumber());
+        turnManager.nextTurn(four);             // 팀 0, 2라운드 (턴 번호는 3)
+        assertEquals(0, four.getCurrentTeam());
+        assertEquals(2, four.getRoundNumber());
+        assertEquals(3, four.getTurnNumber());
+    }
 }
